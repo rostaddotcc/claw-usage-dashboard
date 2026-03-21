@@ -204,7 +204,9 @@ async function refresh() {
         updateCards(overview);
         updateModelFilter(usage);
         renderTimeline(usage);
+        renderCostTimeline(usage);
         renderByModel(usage);
+        renderCostByModel(usage);
         renderCache(cache);
         renderErrors(errors);
         updateErrorTable(errors);
@@ -251,6 +253,26 @@ document.getElementById('sessions-table').querySelector('thead').addEventListene
 document.getElementById('model-filter').addEventListener('change', (e) => {
     currentModel = e.target.value;
     refresh();
+});
+
+// Provider tokens/cost toggle
+document.getElementById('toggle-provider').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn || !lastUsageData) return;
+    document.querySelectorAll('#toggle-provider button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    providerMode = btn.dataset.mode;
+    renderByProvider(lastUsageData);
+});
+
+// Agent tokens/cost toggle
+document.getElementById('toggle-agent').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn || !lastUsageData) return;
+    document.querySelectorAll('#toggle-agent button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    agentMode = btn.dataset.mode;
+    renderByAgent(lastUsageData);
 });
 
 // Period filter click handler

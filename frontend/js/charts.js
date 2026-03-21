@@ -48,6 +48,10 @@ function formatNumber(n) {
     return String(Math.round(n));
 }
 
+function fmtCost(n) {
+    return '$' + n.toFixed(2);
+}
+
 // Store chart instances for cleanup
 const chartInstances = {};
 
@@ -87,27 +91,85 @@ function mergeDeep(target, ...sources) {
     return target;
 }
 
-// Token Usage Over Time - stacked bar
+// Group small items as "other" — keep top N
+function groupTopN(items, n, labelKey, valueKey) {
+    if (items.length <= n) return items;
+    const top = items.slice(0, n);
+    const rest = items.slice(n);
+    const other = { [labelKey]: 'other' };
+    // Sum all numeric fields from rest
+    for (const key of Object.keys(rest[0])) {
+        if (key === labelKey) continue;
+        if (typeof rest[0][key] === 'number') {
+            other[key] = rest.reduce((s, r) => s + (r[key] || 0), 0);
+        }
+    }
+    return [...top, other];
+}
+
+// Donut helper — used by provider and agent charts
+const DONUT_DEFAULTS = {
+    plotOptions: {
+        pie: {
+            donut: {
+                size: '55%',
+                labels: {
+                    show: true,
+                    total: {
+                        show: true,
+                        color: '#00aa2a',
+                        fontSize: '12px',
+                        fontFamily: "'JetBrains Mono', monospace",
+                    },
+                },
+            },
+        },
+    },
+    dataLabels: {
+        style: { fontSize: '10px', fontFamily: "'JetBrains Mono', monospace" },
+    },
+    stroke: { width: 1, colors: ['#0a0a0a'] },
+};
+
+// --- 1. Token Usage Over Time - split: input+output bars, cache as line ---
 function renderTimeline(data) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-timeline'); return; }
 
     const dates = data.over_time.map(d => d.date);
 
     renderChart('#chart-timeline', {
-        chart: { type: 'bar', height: 280, stacked: true },
+        chart: { type: 'line', height: 280 },
         series: [
-            { name: 'input', data: data.over_time.map(d => d.input) },
-            { name: 'output', data: data.over_time.map(d => d.output) },
-            { name: 'cache_read', data: data.over_time.map(d => d.cache_read) },
+            { name: 'input', type: 'bar', data: data.over_time.map(d => d.input) },
+            { name: 'output', type: 'bar', data: data.over_time.map(d => d.output) },
+            { name: 'cache_read', type: 'line', data: data.over_time.map(d => d.cache_read) },
         ],
         colors: ['#00ff41', '#00ffff', '#ffaa00'],
         xaxis: {
             categories: dates,
             labels: { style: { colors: '#005a15', fontSize: '10px' } },
         },
+        yaxis: [
+            {
+                title: { text: 'input / output', style: { color: '#005a15', fontSize: '10px' } },
+                labels: {
+                    style: { colors: '#005a15', fontSize: '10px' },
+                    formatter: val => formatNumber(val),
+                },
+            },
+            {
+                opposite: true,
+                title: { text: 'cache_read', style: { color: '#ffaa00', fontSize: '10px' } },
+                labels: {
+                    style: { colors: '#ffaa00', fontSize: '10px' },
+                    formatter: val => formatNumber(val),
+                },
+            },
+        ],
         plotOptions: {
             bar: { borderRadius: 2, columnWidth: '60%' },
         },
+        stroke: { width: [0, 0, 2], curve: 'smooth' },
         tooltip: {
             y: { formatter: val => val.toLocaleString('sv-SE') + ' tokens' },
         },
@@ -115,18 +177,88 @@ function renderTimeline(data) {
     });
 }
 
-// Usage by Model - horizontal bar
+// --- 2. Cost Over Time - stacked area ---
+function renderCostTimeline(data) {
+    if (!data.over_time || !data.over_time.length) { clearChart('#chart-cost-timeline'); return; }
+
+    const dates = data.over_time.map(d => d.date);
+
+    renderChart('#chart-cost-timeline', {
+        chart: { type: 'area', height: 280 },
+        series: [{ name: 'cost', data: data.over_time.map(d => Math.round(d.cost * 100) / 100) }],
+        colors: ['#ff3333'],
+        xaxis: {
+            categories: dates,
+            labels: { style: { colors: '#005a15', fontSize: '10px' } },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#005a15', fontSize: '10px' },
+                formatter: val => fmtCost(val),
+            },
+        },
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 100] },
+        },
+        stroke: { width: 2, curve: 'smooth' },
+        tooltip: {
+            y: { formatter: val => fmtCost(val) },
+        },
+        dataLabels: { enabled: false },
+    });
+}
+
+// --- 3. Cost by Model - horizontal bar (top 8 + other) ---
+function renderCostByModel(data) {
+    if (!data.by_model || !data.by_model.length) { clearChart('#chart-cost-by-model'); return; }
+
+    const sorted = [...data.by_model].sort((a, b) => b.cost - a.cost);
+    const grouped = groupTopN(sorted, 8, 'model', 'cost');
+    const models = grouped.map(d => d.model);
+    const costs = grouped.map(d => Math.round(d.cost * 100) / 100);
+
+    renderChart('#chart-cost-by-model', {
+        chart: { type: 'bar', height: Math.max(250, models.length * 32) },
+        series: [{ name: 'cost', data: costs }],
+        colors: ['#ff3333'],
+        plotOptions: {
+            bar: { horizontal: true, borderRadius: 2, barHeight: '60%' },
+        },
+        xaxis: {
+            categories: models,
+            labels: {
+                style: { colors: '#005a15', fontSize: '10px' },
+                formatter: val => fmtCost(val),
+            },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#00aa2a', fontSize: '10px' },
+                maxWidth: 180,
+                formatter: val => val,
+            },
+        },
+        tooltip: {
+            y: { formatter: val => fmtCost(val) },
+        },
+        dataLabels: { enabled: false },
+    });
+}
+
+// --- 4. Usage by Model - horizontal bar (top 8 + other) ---
 function renderByModel(data) {
     if (!data.by_model || !data.by_model.length) { clearChart('#chart-by-model'); return; }
 
-    const models = data.by_model.map(d => d.model);
+    const grouped = groupTopN(data.by_model, 8, 'model', 'total');
+    const models = grouped.map(d => d.model);
 
     renderChart('#chart-by-model', {
-        chart: { type: 'bar', height: 280 },
+        chart: { type: 'bar', height: Math.max(250, models.length * 32) },
         series: [
-            { name: 'input', data: data.by_model.map(d => d.input) },
-            { name: 'output', data: data.by_model.map(d => d.output) },
-            { name: 'cache_read', data: data.by_model.map(d => d.cache_read) },
+            { name: 'input', data: grouped.map(d => d.input) },
+            { name: 'output', data: grouped.map(d => d.output) },
+            { name: 'cache_read', data: grouped.map(d => d.cache_read) },
         ],
         colors: ['#00ff41', '#00ffff', '#ffaa00'],
         plotOptions: {
@@ -142,7 +274,7 @@ function renderByModel(data) {
         yaxis: {
             labels: {
                 style: { colors: '#00aa2a', fontSize: '10px' },
-                maxWidth: 160,
+                maxWidth: 180,
                 formatter: val => val,
             },
         },
@@ -222,83 +354,108 @@ function renderErrors(data) {
         series: values,
         labels: labels,
         colors: colors,
+        ...DONUT_DEFAULTS,
         plotOptions: {
             pie: {
                 donut: {
-                    size: '55%',
+                    ...DONUT_DEFAULTS.plotOptions.pie.donut,
                     labels: {
-                        show: true,
+                        ...DONUT_DEFAULTS.plotOptions.pie.donut.labels,
                         total: {
-                            show: true,
+                            ...DONUT_DEFAULTS.plotOptions.pie.donut.labels.total,
                             label: 'total',
-                            color: '#00aa2a',
-                            fontSize: '12px',
-                            fontFamily: "'JetBrains Mono', monospace",
                         },
                     },
                 },
             },
         },
-        dataLabels: {
-            style: { fontSize: '10px', fontFamily: "'JetBrains Mono', monospace" },
-        },
-        stroke: { width: 1, colors: ['#0a0a0a'] },
     });
 }
 
-// Usage by Provider - donut
+// --- 5. Usage by Provider - donut with tokens/cost toggle ---
+let providerMode = 'tokens';
+let lastUsageData = null;
+
 function renderByProvider(data) {
+    lastUsageData = data;
     if (!data.by_provider || !data.by_provider.length) { clearChart('#chart-by-provider'); return; }
+
+    const useCost = providerMode === 'cost';
+    const values = data.by_provider.map(d => useCost ? Math.round(d.cost * 100) / 100 : d.total);
+    const labels = data.by_provider.map(d => d.provider);
+    const centerLabel = useCost ? 'cost' : 'tokens';
 
     renderChart('#chart-by-provider', {
         chart: { type: 'donut', height: 250 },
-        series: data.by_provider.map(d => d.total),
-        labels: data.by_provider.map(d => d.provider),
-        colors: COLORS.slice(0, data.by_provider.length),
+        series: values,
+        labels: labels,
+        colors: COLORS.slice(0, labels.length),
+        ...DONUT_DEFAULTS,
         plotOptions: {
             pie: {
                 donut: {
-                    size: '55%',
+                    ...DONUT_DEFAULTS.plotOptions.pie.donut,
                     labels: {
-                        show: true,
+                        ...DONUT_DEFAULTS.plotOptions.pie.donut.labels,
                         total: {
-                            show: true,
-                            label: 'tokens',
-                            color: '#00aa2a',
-                            fontSize: '12px',
-                            fontFamily: "'JetBrains Mono', monospace",
+                            ...DONUT_DEFAULTS.plotOptions.pie.donut.labels.total,
+                            label: centerLabel,
+                            formatter: () => useCost
+                                ? fmtCost(values.reduce((a, b) => a + b, 0))
+                                : formatNumber(values.reduce((a, b) => a + b, 0)),
                         },
                     },
                 },
             },
         },
-        dataLabels: {
-            style: { fontSize: '10px', fontFamily: "'JetBrains Mono', monospace" },
+        tooltip: {
+            y: {
+                formatter: val => useCost ? fmtCost(val) : val.toLocaleString('sv-SE') + ' tokens',
+            },
         },
-        stroke: { width: 1, colors: ['#0a0a0a'] },
     });
 }
 
-// Usage by Agent - bar
+// Usage by Agent - donut with tokens/cost toggle
+let agentMode = 'tokens';
+
 function renderByAgent(data) {
+    lastUsageData = data;
     if (!data.by_agent || !data.by_agent.length) { clearChart('#chart-by-agent'); return; }
 
+    const useCost = agentMode === 'cost';
+    const values = data.by_agent.map(d => useCost ? Math.round(d.cost * 100) / 100 : d.total);
+    const labels = data.by_agent.map(d => d.agent);
+    const centerLabel = useCost ? 'cost' : 'tokens';
+
     renderChart('#chart-by-agent', {
-        chart: { type: 'bar', height: 250 },
-        series: [
-            { name: 'input', data: data.by_agent.map(d => d.input) },
-            { name: 'output', data: data.by_agent.map(d => d.output) },
-            { name: 'cache_read', data: data.by_agent.map(d => d.cache_read) },
-        ],
-        colors: ['#00ff41', '#00ffff', '#ffaa00'],
-        xaxis: {
-            categories: data.by_agent.map(d => d.agent),
-            labels: { style: { colors: '#005a15', fontSize: '10px' } },
-        },
+        chart: { type: 'donut', height: 250 },
+        series: values,
+        labels: labels,
+        colors: COLORS.slice(0, labels.length),
+        ...DONUT_DEFAULTS,
         plotOptions: {
-            bar: { borderRadius: 2, columnWidth: '50%' },
+            pie: {
+                donut: {
+                    ...DONUT_DEFAULTS.plotOptions.pie.donut,
+                    labels: {
+                        ...DONUT_DEFAULTS.plotOptions.pie.donut.labels,
+                        total: {
+                            ...DONUT_DEFAULTS.plotOptions.pie.donut.labels.total,
+                            label: centerLabel,
+                            formatter: () => useCost
+                                ? fmtCost(values.reduce((a, b) => a + b, 0))
+                                : formatNumber(values.reduce((a, b) => a + b, 0)),
+                        },
+                    },
+                },
+            },
         },
-        dataLabels: { enabled: false },
+        tooltip: {
+            y: {
+                formatter: val => useCost ? fmtCost(val) : val.toLocaleString('sv-SE') + ' tokens',
+            },
+        },
     });
 }
 
@@ -378,7 +535,7 @@ function renderDuration(data) {
 
     // Update title with stats
     const titleEl = document.querySelector('#chart-duration')?.closest('.chart-box')?.querySelector('.chart-title');
-    if (titleEl) titleEl.textContent = `> Session Duration (avg ${fmtMinutes(avg)} · median ${fmtMinutes(median)} · ${sessions.length} sessions)`;
+    if (titleEl) titleEl.textContent = `> Session Duration (avg ${fmtMinutes(avg)} \u00b7 median ${fmtMinutes(median)} \u00b7 ${sessions.length} sessions)`;
 
     renderChart('#chart-duration', {
         chart: { type: 'line', height: 280 },

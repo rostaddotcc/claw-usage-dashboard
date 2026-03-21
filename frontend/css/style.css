@@ -237,6 +237,39 @@ main {
     color: var(--text-dim);
     margin-bottom: 0.8rem;
     letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.chart-toggle {
+    display: inline-flex;
+    gap: 1px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px;
+}
+
+.chart-toggle button {
+    font-family: inherit;
+    font-size: 0.6rem;
+    padding: 0.2rem 0.5rem;
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    cursor: pointer;
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+}
+
+.chart-toggle button:hover {
+    color: var(--text-dim);
+}
+
+.chart-toggle button.active {
+    background: rgba(0, 255, 65, 0.12);
+    color: var(--text-primary);
 }
 
 /* Table */
