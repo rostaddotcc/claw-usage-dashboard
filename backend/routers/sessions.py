@@ -51,6 +51,9 @@ def get_sessions(
 
     result = []
     for sid, s in sessions.items():
+        duration_min = None
+        if s["start_time"] and s["end_time"]:
+            duration_min = round((s["end_time"] - s["start_time"]).total_seconds() / 60, 1)
         result.append({
             "session_id": sid[:8],
             "session_id_full": sid,
@@ -59,6 +62,7 @@ def get_sessions(
             "total_tokens": s["total_tokens"],
             "message_count": s["message_count"],
             "cost": round(s["cost"], 4),
+            "duration_minutes": duration_min,
             "start_time": s["start_time"].isoformat() if s["start_time"] else None,
             "end_time": s["end_time"].isoformat() if s["end_time"] else None,
         })

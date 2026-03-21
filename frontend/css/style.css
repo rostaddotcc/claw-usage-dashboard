@@ -94,6 +94,30 @@ h1 {
     font-weight: 300;
 }
 
+.model-filter select {
+    font-family: inherit;
+    font-size: 0.75rem;
+    padding: 0.35rem 0.7rem;
+    background: var(--bg-card);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+}
+
+.model-filter select:hover,
+.model-filter select:focus {
+    color: var(--text-primary);
+    border-color: var(--border-bright);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .period-filter {
     display: flex;
     gap: 2px;

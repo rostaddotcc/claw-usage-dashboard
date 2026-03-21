@@ -18,6 +18,11 @@
             <span class="subtitle">OpenClaw Usage Dashboard</span>
         </div>
         <div class="header-right">
+            <div class="model-filter">
+                <select id="model-filter">
+                    <option value="">ALL MODELS</option>
+                </select>
+            </div>
             <div class="period-filter" id="period-filter">
                 <button data-period="hour">1H</button>
                 <button data-period="day">1D</button>
@@ -99,6 +104,11 @@
                 <div class="chart-title">> Tool Usage Over Time</div>
                 <div id="chart-tools-timeline"></div>
             </div>
+
+            <div class="chart-box wide">
+                <div class="chart-title">> Session Duration</div>
+                <div id="chart-duration"></div>
+            </div>
         </section>
 
         <section class="table-section collapsible">
@@ -116,6 +126,7 @@
                                 <th>TOKENS</th>
                                 <th>MSGS</th>
                                 <th>COST</th>
+                                <th>DURATION</th>
                                 <th>TIME</th>
                             </tr>
                         </thead>

@@ -105,15 +105,21 @@ Debug endpoints exist at `/api/tools/debug` and `/api/tools/raw` for diagnosing 
 
 Each parsed record from `SessionCollector` contains: agent, session_id, timestamp, provider, model, api, stop_reason, role, input/output/cache_read/cache_write tokens, total_tokens, per-component cost breakdown (cost_input, cost_output, cost_cache_read, cost_cache_write, cost_total), and tools (list of tool names called in that message).
 
+The `/api/sessions` endpoint aggregates records per session and computes `duration_minutes` from the time span between first and last message.
+
 ### API query parameters
 
-All `/api/*` endpoints accept: `period` (hour/day/week/month/all), `agent`, `model`, `provider`. Endpoints with time-series data also accept `granularity` (minute/hour/day/week/month). The frontend auto-selects granularity based on period (e.g. hour→minute, day→hour, week/month→day, all→week).
+All `/api/*` endpoints accept: `period` (hour/day/week/month/quarter/half/year/all), `agent`, `model`, `provider`. Endpoints with time-series data also accept `granularity` (minute/hour/day/week/month). The frontend auto-selects granularity based on period (e.g. hour→minute, day→hour, week/month→day, quarter/half→week, year→month, all→week).
 
 ### Frontend
 
-Single-page HTML with no build step (`lang="sv"`). Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Date/time formatting uses `sv-SE` locale. Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering). Script tags include `?v=N` cache-busting parameters — bump these when deploying frontend changes.
+Single-page HTML with no build step (`lang="sv"`). Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Date/time formatting uses `sv-SE` locale. Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering).
+
+The header contains a model filter dropdown (populated from usage data) and period buttons (1H/1D/7D/30D/3M/6M/12M/ALL). Both filters trigger a full data refresh. The sessions table is collapsible (closed by default, toggled via CSS class `open` on the `.collapsible` section).
 
 All charts go through `renderChart(id, options)` which destroys the previous instance (tracked in `chartInstances`) and deep-merges `CHART_DEFAULTS` (terminal theme colors, fonts) with the per-chart options. To add a new chart: call `renderChart('#my-chart', { ... })` — the theme is applied automatically. When data is empty, `clearChart(id)` destroys the chart and shows a "no data" message.
+
+Script tags and the CSS link include `?v=N` cache-busting parameters — bump these when deploying frontend changes.
 
 ### Error classification
 

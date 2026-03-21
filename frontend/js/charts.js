@@ -326,6 +326,52 @@ function renderToolCounts(data) {
     });
 }
 
+// Session Duration - bar chart
+function renderDuration(data) {
+    if (!data.sessions || !data.sessions.length) { clearChart('#chart-duration'); return; }
+
+    const sessions = data.sessions
+        .filter(s => s.duration_minutes != null && s.duration_minutes > 0)
+        .slice(0, 50);
+
+    if (!sessions.length) { clearChart('#chart-duration'); return; }
+
+    renderChart('#chart-duration', {
+        chart: { type: 'bar', height: 280 },
+        series: [{ name: 'duration', data: sessions.map(s => Math.round(s.duration_minutes)) }],
+        colors: ['#aa55ff'],
+        xaxis: {
+            categories: sessions.map(s => s.agent + '/' + s.session_id),
+            labels: { style: { colors: '#005a15', fontSize: '9px' }, rotate: -45, maxHeight: 60 },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#005a15', fontSize: '10px' },
+                formatter: val => {
+                    if (val < 60) return Math.round(val) + 'm';
+                    const h = Math.floor(val / 60);
+                    const m = Math.round(val % 60);
+                    return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
+                },
+            },
+        },
+        plotOptions: {
+            bar: { borderRadius: 2, columnWidth: '60%' },
+        },
+        tooltip: {
+            y: {
+                formatter: val => {
+                    if (val < 60) return Math.round(val) + ' min';
+                    const h = Math.floor(val / 60);
+                    const m = Math.round(val % 60);
+                    return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
+                },
+            },
+        },
+        dataLabels: { enabled: false },
+    });
+}
+
 // Tool Usage Over Time - stacked bar
 function renderToolTimeline(data) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-tools-timeline'); return; }
