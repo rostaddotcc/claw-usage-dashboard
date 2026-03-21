@@ -285,6 +285,33 @@ th {
     letter-spacing: 0.1em;
     padding: 0.5rem 0.8rem;
     border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+th:hover {
+    color: var(--text-dim);
+}
+
+th::after {
+    content: '';
+    margin-left: 0.3rem;
+    font-size: 0.6em;
+}
+
+th.sorted.asc::after {
+    content: '▲';
+    color: var(--text-primary);
+}
+
+th.sorted.desc::after {
+    content: '▼';
+    color: var(--text-primary);
+}
+
+th.sorted {
+    color: var(--text-dim);
 }
 
 td {
