@@ -9,9 +9,15 @@ Claw Usage Dashboard is a retro terminal-styled web dashboard for monitoring Ope
 ## Commands
 
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
 # Run locally (requires DATA_DIR pointing to an OpenClaw data directory)
 # Must run from the project root — frontend is served via StaticFiles(directory="frontend")
 DATA_DIR=/path/to/.openclaw uvicorn backend.main:app --port 8090
+
+# Run locally with auto-reload for development
+DATA_DIR=/path/to/.openclaw uvicorn backend.main:app --port 8090 --reload
 
 # Build and run with Docker
 docker compose up -d --build
