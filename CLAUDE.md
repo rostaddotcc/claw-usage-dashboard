@@ -10,6 +10,7 @@ Claw Usage Dashboard is a retro terminal-styled web dashboard for monitoring Ope
 
 ```bash
 # Run locally (requires DATA_DIR pointing to an OpenClaw data directory)
+# Must run from the project root — frontend is served via StaticFiles(directory="frontend")
 DATA_DIR=/path/to/.openclaw uvicorn backend.main:app --port 8090
 
 # Build and run with Docker
@@ -18,7 +19,11 @@ docker compose up -d --build
 # The container mounts /home/rostads/.openclaw as /data (read-only)
 ```
 
+Requires Python 3.13. Dependencies are minimal: just `fastapi` and `uvicorn` (see `requirements.txt`).
+
 There are no tests, linters, or build steps configured.
+
+Note: the docker-compose service and `BaseCollector` docstring still reference "Molt", a legacy name for this project.
 
 ## Architecture
 
@@ -40,6 +45,8 @@ FastAPI serves both the JSON API (`/api/*`) and the static frontend (`/`) from a
 
 `SessionCollector` is instantiated as a module-level singleton (`backend/collectors/sessions.py:collector`) imported directly by routers. It maintains an in-memory cache with a 30-second TTL (`CACHE_TTL_SECONDS` in `backend/config.py`).
 
+Only JSONL entries with `type: "message"` that contain a `usage` object are parsed — all other entry types (system, tool results, etc.) are silently skipped.
+
 ### Aggregators
 
 Pure functions in `backend/aggregators/` that take a list of normalized records and return grouped/computed results. Three modules: `usage.py` (by model/provider/agent/time), `cache.py` (hit rates), `errors.py` (stop reason analysis). The shared `_time_key()` helper in `usage.py` is also imported by `cache.py` and `errors.py` for consistent time bucketing.
@@ -58,7 +65,9 @@ All `/api/*` endpoints accept: `period` (day/week/month/all), `agent`, `model`, 
 
 ### Frontend
 
-Single-page HTML with no build step. Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering). All chart instances are tracked in `chartInstances` for proper cleanup on re-render.
+Single-page HTML with no build step. Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering).
+
+All charts go through `renderChart(id, options)` which destroys the previous instance (tracked in `chartInstances`) and deep-merges `CHART_DEFAULTS` (terminal theme colors, fonts) with the per-chart options. To add a new chart: call `renderChart('#my-chart', { ... })` — the theme is applied automatically.
 
 ### Error classification
 

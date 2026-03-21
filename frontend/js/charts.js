@@ -118,14 +118,16 @@ function renderByModel(data) {
             bar: { horizontal: true, borderRadius: 2, barHeight: '60%' },
         },
         xaxis: {
-            categories: models,
-            labels: { style: { colors: '#005a15', fontSize: '10px' } },
+            labels: {
+                style: { colors: '#005a15', fontSize: '10px' },
+                formatter: val => formatNumber(val),
+            },
         },
         yaxis: {
+            categories: models,
             labels: {
                 style: { colors: '#00aa2a', fontSize: '10px' },
                 maxWidth: 160,
-                formatter: val => val,
             },
         },
         dataLabels: { enabled: false },

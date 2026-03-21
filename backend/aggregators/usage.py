@@ -94,7 +94,11 @@ def aggregate_by_model_over_time(records: list[dict[str, Any]], granularity: str
 
 
 def _time_key(ts, granularity: str) -> str:
-    if granularity == "month":
+    if granularity == "minute":
+        return ts.strftime("%H:%M")
+    elif granularity == "hour":
+        return ts.strftime("%Y-%m-%d %H:00")
+    elif granularity == "month":
         return ts.strftime("%Y-%m")
     elif granularity == "week":
         iso = ts.isocalendar()

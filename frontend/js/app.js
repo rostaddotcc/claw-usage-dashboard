@@ -49,7 +49,8 @@ function updateTable(data) {
 
 // Determine chart granularity based on period
 function getGranularity(period) {
-    if (period === 'day') return 'day';
+    if (period === 'hour') return 'minute';
+    if (period === 'day') return 'hour';
     if (period === 'week') return 'day';
     if (period === 'month') return 'day';
     return 'week';

@@ -11,7 +11,9 @@ router = APIRouter()
 
 def _period_to_dates(period: str) -> dict:
     now = datetime.now(timezone.utc)
-    if period == "day":
+    if period == "hour":
+        return {"start_date": (now - timedelta(hours=1)).isoformat()}
+    elif period == "day":
         return {"start_date": (now - timedelta(days=1)).isoformat()}
     elif period == "week":
         return {"start_date": (now - timedelta(weeks=1)).isoformat()}
