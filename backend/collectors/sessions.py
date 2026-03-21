@@ -57,10 +57,10 @@ class SessionCollector(BaseCollector):
 
             agent_name = agent_dir.name
 
-            for session_file in sessions_dir.glob("*.jsonl"):
-                if session_file.name == "sessions.json":
+            for session_file in sessions_dir.glob("*.jsonl*"):
+                if not session_file.is_file():
                     continue
-                session_id = session_file.stem
+                session_id = session_file.name.split(".jsonl")[0]
 
                 try:
                     with open(session_file) as f:
@@ -71,8 +71,79 @@ class SessionCollector(BaseCollector):
                 except (OSError, json.JSONDecodeError):
                     continue
 
+        # Parse cron runs (different format: top-level usage, snake_case fields)
+        cron_path = Path(DATA_DIR) / "cron" / "runs"
+        if cron_path.exists():
+            for cron_file in cron_path.glob("*.jsonl*"):
+                if not cron_file.is_file():
+                    continue
+                session_id = cron_file.name.split(".jsonl")[0]
+                try:
+                    with open(cron_file) as f:
+                        for line in f:
+                            record = self._parse_cron_line(line, session_id)
+                            if record:
+                                records.append(record)
+                except (OSError, json.JSONDecodeError):
+                    continue
+
         records.sort(key=lambda r: r["timestamp"])
         return records
+
+    def _parse_cron_line(self, line: str, session_id: str) -> dict[str, Any] | None:
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+
+        # Cron entries may have usage at top level with snake_case fields,
+        # or nested in message with camelCase fields (try both)
+        msg = entry.get("message", {})
+        if not isinstance(msg, dict):
+            msg = {}
+
+        usage = msg.get("usage") or entry.get("usage") or entry.get("data", {}).get("usage")
+        if not usage:
+            return None
+
+        # Need at least some token usage
+        input_t = usage.get("input", 0) or usage.get("input_tokens", 0)
+        output_t = usage.get("output", 0) or usage.get("output_tokens", 0)
+        if input_t == 0 and output_t == 0:
+            return None
+
+        ts_str = entry.get("timestamp", "") or msg.get("timestamp", "")
+        try:
+            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            return None
+
+        cache_read = usage.get("cacheRead", 0) or usage.get("cache_read", 0) or usage.get("cache_read_input_tokens", 0)
+        cache_write = usage.get("cacheWrite", 0) or usage.get("cache_write", 0) or usage.get("cache_creation_input_tokens", 0)
+        total = usage.get("totalTokens", 0) or (input_t + output_t + cache_read + cache_write)
+        cost = usage.get("cost", {})
+
+        return {
+            "agent": "cron",
+            "session_id": session_id,
+            "timestamp": ts,
+            "provider": msg.get("provider") or entry.get("provider", "unknown"),
+            "model": msg.get("model") or entry.get("model", "unknown"),
+            "api": msg.get("api", ""),
+            "stop_reason": msg.get("stopReason") or entry.get("stop_reason", "unknown"),
+            "role": msg.get("role", ""),
+            "input_tokens": input_t,
+            "output_tokens": output_t,
+            "cache_read": cache_read,
+            "cache_write": cache_write,
+            "total_tokens": total,
+            "cost_input": cost.get("input", 0),
+            "cost_output": cost.get("output", 0),
+            "cost_cache_read": cost.get("cacheRead", 0) or cost.get("cache_read", 0),
+            "cost_cache_write": cost.get("cacheWrite", 0) or cost.get("cache_write", 0),
+            "cost_total": cost.get("total", 0),
+            "tools": [],
+        }
 
     def _parse_line(self, line: str, agent: str, session_id: str) -> dict[str, Any] | None:
         try:

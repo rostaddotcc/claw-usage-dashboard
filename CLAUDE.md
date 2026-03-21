@@ -36,7 +36,7 @@ Note: the docker-compose service and `BaseCollector` docstring still reference "
 Data flows through a three-layer pipeline:
 
 ```
-JSONL files (/data/agents/*/sessions/*.jsonl)
+JSONL files (/data/agents/*/sessions/*.jsonl*, /data/cron/runs/*.jsonl*)
   → Collectors (parse & filter raw data)
     → Aggregators (group & compute metrics)
       → Routers (FastAPI endpoints at /api/*)
@@ -53,9 +53,15 @@ FastAPI serves both the JSON API (`/api/*`) and the static frontend (`/`) from a
 
 Only JSONL entries with `type: "message"` that contain a `usage` object are parsed — all other entry types (system, tool results, etc.) are silently skipped. Tool calls are extracted from the `content` array of these entries (blocks with `type: "toolCall"` or `type: "tool_use"`).
 
+Cron runs (`/data/cron/runs/*.jsonl*`) are parsed separately via `_parse_cron_line()`. Cron entries use a different format: usage may be at the top level (not nested in `message`), and field names use snake_case (`input_tokens`, `output_tokens`) instead of camelCase. Cron records are assigned `agent: "cron"`.
+
 ### OpenClaw JSONL format
 
-OpenClaw stores session data at `~/.openclaw/agents/<agentId>/sessions/<sessionId>.jsonl`. Each line is a JSON object. The entries the dashboard parses have this structure:
+OpenClaw stores session data at `~/.openclaw/agents/<agentId>/sessions/<sessionId>.jsonl`. When a session is reset with `/new`, the file is renamed to `.jsonl.reset.<timestamp>` — these files still contain valid data. Deleted sessions become `.jsonl.deleted.<timestamp>`. The glob pattern `*.jsonl*` catches all variants.
+
+Cron jobs log separately to `~/.openclaw/cron/runs/*.jsonl`.
+
+Each line is a JSON object. The entries the dashboard parses have this structure:
 
 ```json
 {
@@ -105,7 +111,7 @@ All `/api/*` endpoints accept: `period` (hour/day/week/month/all), `agent`, `mod
 
 ### Frontend
 
-Single-page HTML with no build step. Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering). Script tags include `?v=N` cache-busting parameters — bump these when deploying frontend changes.
+Single-page HTML with no build step (`lang="sv"`). Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Date/time formatting uses `sv-SE` locale. Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering). Script tags include `?v=N` cache-busting parameters — bump these when deploying frontend changes.
 
 All charts go through `renderChart(id, options)` which destroys the previous instance (tracked in `chartInstances`) and deep-merges `CHART_DEFAULTS` (terminal theme colors, fonts) with the per-chart options. To add a new chart: call `renderChart('#my-chart', { ... })` — the theme is applied automatically. When data is empty, `clearChart(id)` destroys the chart and shows a "no data" message.
 
