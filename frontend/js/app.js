@@ -108,13 +108,13 @@ async function refresh() {
     }
 }
 
-// Update model filter dropdown
+// Update model filter dropdown (only when no model filter is active, to preserve full list)
 function updateModelFilter(usage) {
+    if (currentModel) return;
     const select = document.getElementById('model-filter');
     const models = (usage.by_model || []).map(d => d.model).sort();
-    const prev = select.value;
     const options = '<option value="">ALL MODELS</option>' +
-        models.map(m => `<option value="${m}"${m === prev ? ' selected' : ''}>${m}</option>`).join('');
+        models.map(m => `<option value="${m}">${m}</option>`).join('');
     select.innerHTML = options;
 }
 

@@ -104,12 +104,18 @@ h1 {
     border-radius: 4px;
     cursor: pointer;
     outline: none;
+    height: 100%;
 }
 
 .model-filter select:hover,
 .model-filter select:focus {
     color: var(--text-primary);
     border-color: var(--border-bright);
+}
+
+.model-filter select option {
+    background: var(--bg-card);
+    color: var(--text-dim);
 }
 
 .header-right {
