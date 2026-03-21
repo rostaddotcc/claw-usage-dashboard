@@ -5,9 +5,9 @@ Retro terminal-styled web dashboard for monitoring [OpenClaw](https://github.com
 ![Python](https://img.shields.io/badge/python-3.13-blue)
 ![FastAPI](https://img.shields.io/badge/fastapi-0.115-green)
 
-## Screenshots
+## Live Demo
 
-<!-- Add screenshots here -->
+[molt.rostad.cc](https://molt.rostad.cc)
 
 ## Features
 
