@@ -1,6 +1,6 @@
 # Claw Usage Dashboard
 
-Retro terminal-styled web dashboard for monitoring [OpenClaw](https://github.com/openclaw) AI gateway usage. Reads session JSONL logs and presents token usage, cache rates, error rates, and cost breakdowns via interactive charts.
+Retro terminal-styled web dashboard for monitoring [OpenClaw](https://github.com/openclaw) AI gateway usage. Reads session JSONL logs and presents token usage, cache rates, error rates, cost breakdowns, and tool usage via interactive charts.
 
 ![Python](https://img.shields.io/badge/python-3.13-blue)
 ![FastAPI](https://img.shields.io/badge/fastapi-0.115-green)
@@ -12,11 +12,12 @@ Retro terminal-styled web dashboard for monitoring [OpenClaw](https://github.com
 ## Features
 
 - **Token usage tracking** — input, output, and cache tokens over time, by model, provider, and agent
+- **Tool usage tracking** — tracks tool calls (exec, web_search, read, web_fetch, edit, write, etc.) with counts and time-series charts
 - **Cache hit rate monitoring** — overall and per-model cache performance with trend charts
 - **Error analysis** — stop reason distribution and error rate over time
 - **Cost breakdown** — per-session and aggregate cost tracking
 - **Session browser** — table view of all sessions with model, token, and cost details
-- **Time filtering** — 1D / 7D / 30D / ALL period selection
+- **Time filtering** — 1H / 1D / 7D / 30D / ALL period selection with auto-granularity
 - **Zero dependencies frontend** — vanilla JS with ApexCharts via CDN, no build step
 
 ## Quick Start
@@ -65,7 +66,7 @@ FastAPI serves both the JSON API and the static frontend from a single process.
 
 ### API Endpoints
 
-All endpoints accept query parameters: `period` (day/week/month/all), `agent`, `model`, `provider`.
+All endpoints accept query parameters: `period` (hour/day/week/month/all), `agent`, `model`, `provider`.
 
 | Endpoint | Description |
 |----------|-------------|
@@ -74,8 +75,9 @@ All endpoints accept query parameters: `period` (day/week/month/all), `agent`, `
 | `GET /api/cache` | Cache hit rates overall, by model, and over time |
 | `GET /api/errors` | Error rate, stop reason distribution, and errors over time |
 | `GET /api/sessions` | Per-session breakdown with models, tokens, cost, and timestamps |
+| `GET /api/tools` | Tool usage counts, over time, and by agent |
 
-Endpoints with time-series data also accept `granularity` (day/week/month).
+Endpoints with time-series data also accept `granularity` (minute/hour/day/week/month). The frontend auto-selects granularity based on period (hour→minute, day→hour, week/month→day, all→week).
 
 ## License
 

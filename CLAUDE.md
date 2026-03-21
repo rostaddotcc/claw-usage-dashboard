@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Claw Usage Dashboard
 
-Claw Usage Dashboard is a retro terminal-styled web dashboard for monitoring OpenClaw (AI gateway) usage. It reads session JSONL logs and presents token usage, cache rates, error rates, and cost breakdowns via interactive charts.
+Claw Usage Dashboard is a retro terminal-styled web dashboard for monitoring OpenClaw (AI gateway) usage. It reads session JSONL logs and presents token usage, cache rates, error rates, cost breakdowns, and tool usage via interactive charts.
 
 ## Commands
 
@@ -37,7 +37,7 @@ JSONL files (/data/agents/*/sessions/*.jsonl)
         → Frontend (ApexCharts + vanilla JS)
 ```
 
-FastAPI serves both the JSON API (`/api/*`) and the static frontend (`/`) from a single process.
+FastAPI serves both the JSON API (`/api/*`) and the static frontend (`/`) from a single process. A middleware sets `no-cache` headers on `/js/` and `/css/` files to prevent stale browser caches after deploys.
 
 ### Collector pattern
 
@@ -45,19 +45,53 @@ FastAPI serves both the JSON API (`/api/*`) and the static frontend (`/`) from a
 
 `SessionCollector` is instantiated as a module-level singleton (`backend/collectors/sessions.py:collector`) imported directly by routers. It maintains an in-memory cache with a 30-second TTL (`CACHE_TTL_SECONDS` in `backend/config.py`).
 
-Only JSONL entries with `type: "message"` that contain a `usage` object are parsed — all other entry types (system, tool results, etc.) are silently skipped.
+Only JSONL entries with `type: "message"` that contain a `usage` object are parsed — all other entry types (system, tool results, etc.) are silently skipped. Tool calls are extracted from the `content` array of these entries (blocks with `type: "toolCall"` or `type: "tool_use"`).
+
+### OpenClaw JSONL format
+
+OpenClaw stores session data at `~/.openclaw/agents/<agentId>/sessions/<sessionId>.jsonl`. Each line is a JSON object. The entries the dashboard parses have this structure:
+
+```json
+{
+  "type": "message",
+  "id": "...",
+  "parentId": "...",
+  "timestamp": "2026-03-21T14:38:00Z",
+  "message": {
+    "role": "assistant",
+    "content": [
+      {"type": "thinking", "...": "..."},
+      {"type": "toolCall", "id": "toolu_...", "name": "exec", "input": {"..."}}
+    ],
+    "api": "messages",
+    "provider": "anthropic",
+    "model": "claude-opus-4-6",
+    "usage": {"input": 4, "output": 300, "cacheRead": 71838, "totalTokens": 144131, "cost": {"input": 0.0, "output": 0.01, "cacheRead": 0.10, "total": 0.11}},
+    "stopReason": "toolUse",
+    "timestamp": "..."
+  }
+}
+```
+
+Key format details:
+- Tool calls use `"type": "toolCall"` (not the Anthropic API's `"tool_use"`)
+- Usage fields use short camelCase: `input`, `output`, `cacheRead`, `cacheWrite`, `totalTokens` (not `input_tokens` etc.)
+- Stop reasons use camelCase: `stopReason: "toolUse"` (not `stop_reason: "tool_use"`)
+- Cost is nested: `usage.cost.{input, output, cacheRead, cacheWrite, total}`
 
 ### Aggregators
 
-Pure functions in `backend/aggregators/` that take a list of normalized records and return grouped/computed results. Three modules: `usage.py` (by model/provider/agent/time), `cache.py` (hit rates), `errors.py` (stop reason analysis). The shared `_time_key()` helper in `usage.py` is also imported by `cache.py` and `errors.py` for consistent time bucketing.
+Pure functions in `backend/aggregators/` that take a list of normalized records and return grouped/computed results. Four modules: `usage.py` (by model/provider/agent/time), `cache.py` (hit rates), `errors.py` (stop reason analysis), `tools.py` (tool call counts and trends). The shared `_time_key()` helper in `usage.py` is also imported by `cache.py`, `errors.py`, and `tools.py` for consistent time bucketing.
 
 ### Routers
 
-All routers share a common pattern: they import the singleton `collector`, call `_period_to_dates()` from `backend/routers/overview.py` to convert period strings into date filters, then delegate to aggregator functions. Five endpoints: `/api/overview`, `/api/usage`, `/api/cache`, `/api/errors`, `/api/sessions`.
+All routers share a common pattern: they import the singleton `collector`, call `_period_to_dates()` from `backend/routers/overview.py` to convert period strings into date filters, then delegate to aggregator functions. Six endpoints: `/api/overview`, `/api/usage`, `/api/cache`, `/api/errors`, `/api/sessions`, `/api/tools`.
+
+Debug endpoints exist at `/api/tools/debug` and `/api/tools/raw` for diagnosing tool parsing issues.
 
 ### Session data model
 
-Each parsed record from `SessionCollector` contains: agent, session_id, timestamp, provider, model, api, stop_reason, role, input/output/cache_read/cache_write tokens, total_tokens, and per-component cost breakdown (cost_input, cost_output, cost_cache_read, cost_cache_write, cost_total).
+Each parsed record from `SessionCollector` contains: agent, session_id, timestamp, provider, model, api, stop_reason, role, input/output/cache_read/cache_write tokens, total_tokens, per-component cost breakdown (cost_input, cost_output, cost_cache_read, cost_cache_write, cost_total), and tools (list of tool names called in that message).
 
 ### API query parameters
 
@@ -65,9 +99,9 @@ All `/api/*` endpoints accept: `period` (hour/day/week/month/all), `agent`, `mod
 
 ### Frontend
 
-Single-page HTML with no build step. Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering).
+Single-page HTML with no build step. Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering). Script tags include `?v=N` cache-busting parameters — bump these when deploying frontend changes.
 
-All charts go through `renderChart(id, options)` which destroys the previous instance (tracked in `chartInstances`) and deep-merges `CHART_DEFAULTS` (terminal theme colors, fonts) with the per-chart options. To add a new chart: call `renderChart('#my-chart', { ... })` — the theme is applied automatically.
+All charts go through `renderChart(id, options)` which destroys the previous instance (tracked in `chartInstances`) and deep-merges `CHART_DEFAULTS` (terminal theme colors, fonts) with the per-chart options. To add a new chart: call `renderChart('#my-chart', { ... })` — the theme is applied automatically. When data is empty, `clearChart(id)` destroys the chart and shows a "no data" message.
 
 ### Error classification
 

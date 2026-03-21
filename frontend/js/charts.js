@@ -138,6 +138,7 @@ function renderByModel(data) {
             labels: {
                 style: { colors: '#00aa2a', fontSize: '10px' },
                 maxWidth: 160,
+                formatter: val => val,
             },
         },
         dataLabels: { enabled: false },
@@ -318,6 +319,7 @@ function renderToolCounts(data) {
             labels: {
                 style: { colors: '#00aa2a', fontSize: '10px' },
                 maxWidth: 160,
+                formatter: val => val,
             },
         },
         dataLabels: { enabled: false },
