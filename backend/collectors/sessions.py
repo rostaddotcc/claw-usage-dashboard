@@ -101,7 +101,7 @@ class SessionCollector(BaseCollector):
         content = msg.get("content") or entry.get("content") or []
         if isinstance(content, list):
             for block in content:
-                if isinstance(block, dict) and block.get("type") == "tool_use":
+                if isinstance(block, dict) and block.get("type") in ("tool_use", "toolCall"):
                     tools.append(block.get("name", "unknown"))
 
         return {
