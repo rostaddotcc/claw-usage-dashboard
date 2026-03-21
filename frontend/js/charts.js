@@ -18,6 +18,8 @@ const CHART_DEFAULTS = {
     },
     tooltip: {
         theme: 'dark',
+        shared: true,
+        intersect: false,
         style: { fontSize: '11px', fontFamily: "'JetBrains Mono', monospace" },
         x: { show: true },
     },
