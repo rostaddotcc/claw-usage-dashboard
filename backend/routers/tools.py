@@ -30,3 +30,28 @@ def get_tools(
         "over_time": tool_usage_over_time(records, granularity),
         "by_agent": tool_usage_by_agent(records),
     }
+
+
+@router.get("/tools/debug")
+def debug_tools(limit: int = Query(5)):
+    """Show sample records to diagnose tool parsing."""
+    records = collector.collect()
+    with_tools = [r for r in records if r.get("tools")]
+    tool_use_stops = [r for r in records if r.get("stop_reason") in ("toolUse", "tool_use")]
+
+    samples = []
+    for r in (with_tools or tool_use_stops)[:limit]:
+        samples.append({
+            "session_id": r["session_id"][:8],
+            "stop_reason": r["stop_reason"],
+            "tools": r.get("tools", []),
+            "model": r["model"],
+            "timestamp": r["timestamp"].isoformat(),
+        })
+
+    return {
+        "total_records": len(records),
+        "records_with_tools": len(with_tools),
+        "records_with_toolUse_stop": len(tool_use_stops),
+        "samples": samples,
+    }

@@ -97,7 +97,8 @@ class SessionCollector(BaseCollector):
         cost = usage.get("cost", {})
 
         tools = []
-        content = msg.get("content", [])
+        # content may be in msg (nested format) or entry (flat format)
+        content = msg.get("content") or entry.get("content") or []
         if isinstance(content, list):
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
