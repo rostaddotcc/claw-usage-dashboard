@@ -61,7 +61,7 @@ Each parsed record from `SessionCollector` contains: agent, session_id, timestam
 
 ### API query parameters
 
-All `/api/*` endpoints accept: `period` (day/week/month/all), `agent`, `model`, `provider`. Endpoints with time-series data also accept `granularity` (day/week/month).
+All `/api/*` endpoints accept: `period` (hour/day/week/month/all), `agent`, `model`, `provider`. Endpoints with time-series data also accept `granularity` (minute/hour/day/week/month). The frontend auto-selects granularity based on period (e.g. hour→minute, day→hour, week/month→day, all→week).
 
 ### Frontend
 

@@ -16,4 +16,5 @@ const API = {
     cache(params)    { return this.get('cache', params); },
     errors(params)   { return this.get('errors', params); },
     sessions(params) { return this.get('sessions', params); },
+    tools(params)    { return this.get('tools', params); },
 };

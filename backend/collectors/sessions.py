@@ -96,6 +96,13 @@ class SessionCollector(BaseCollector):
 
         cost = usage.get("cost", {})
 
+        tools = []
+        content = msg.get("content", [])
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    tools.append(block.get("name", "unknown"))
+
         return {
             "agent": agent,
             "session_id": session_id,
@@ -115,6 +122,7 @@ class SessionCollector(BaseCollector):
             "cost_cache_read": cost.get("cacheRead", 0),
             "cost_cache_write": cost.get("cacheWrite", 0),
             "cost_total": cost.get("total", 0),
+            "tools": tools,
         }
 
 

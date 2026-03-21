@@ -250,6 +250,16 @@ footer {
     50% { opacity: 0; }
 }
 
+/* No data state */
+.no-data {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
 /* Loading state */
 .loading .card-value {
     animation: pulse 1.5s ease-in-out infinite;

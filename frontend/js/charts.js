@@ -49,12 +49,22 @@ function formatNumber(n) {
 // Store chart instances for cleanup
 const chartInstances = {};
 
+function clearChart(id) {
+    if (chartInstances[id]) {
+        chartInstances[id].destroy();
+        delete chartInstances[id];
+    }
+    const el = document.querySelector(id);
+    if (el) el.innerHTML = '<div class="no-data">no data</div>';
+}
+
 function renderChart(id, options) {
     if (chartInstances[id]) {
         chartInstances[id].destroy();
     }
     const el = document.querySelector(id);
     if (!el) return;
+    el.innerHTML = '';
     const merged = mergeDeep({}, CHART_DEFAULTS, options);
     const chart = new ApexCharts(el, merged);
     chart.render();
@@ -77,7 +87,7 @@ function mergeDeep(target, ...sources) {
 
 // Token Usage Over Time - stacked bar
 function renderTimeline(data) {
-    if (!data.over_time || !data.over_time.length) return;
+    if (!data.over_time || !data.over_time.length) { clearChart('#chart-timeline'); return; }
 
     const dates = data.over_time.map(d => d.date);
 
@@ -102,7 +112,7 @@ function renderTimeline(data) {
 
 // Usage by Model - horizontal bar
 function renderByModel(data) {
-    if (!data.by_model || !data.by_model.length) return;
+    if (!data.by_model || !data.by_model.length) { clearChart('#chart-by-model'); return; }
 
     const models = data.by_model.map(d => d.model);
 
@@ -118,13 +128,13 @@ function renderByModel(data) {
             bar: { horizontal: true, borderRadius: 2, barHeight: '60%' },
         },
         xaxis: {
+            categories: models,
             labels: {
                 style: { colors: '#005a15', fontSize: '10px' },
                 formatter: val => formatNumber(val),
             },
         },
         yaxis: {
-            categories: models,
             labels: {
                 style: { colors: '#00aa2a', fontSize: '10px' },
                 maxWidth: 160,
@@ -136,7 +146,7 @@ function renderByModel(data) {
 
 // Cache Hit Rate - area chart
 function renderCache(data) {
-    if (!data.over_time || !data.over_time.length) return;
+    if (!data.over_time || !data.over_time.length) { clearChart('#chart-cache'); return; }
 
     renderChart('#chart-cache', {
         chart: { type: 'area', height: 250 },
@@ -186,7 +196,7 @@ function renderCache(data) {
 
 // Stop Reasons - donut
 function renderErrors(data) {
-    if (!data.stop_reasons || !Object.keys(data.stop_reasons).length) return;
+    if (!data.stop_reasons || !Object.keys(data.stop_reasons).length) { clearChart('#chart-errors'); return; }
 
     const labels = Object.keys(data.stop_reasons);
     const values = Object.values(data.stop_reasons);
@@ -229,7 +239,7 @@ function renderErrors(data) {
 
 // Usage by Provider - donut
 function renderByProvider(data) {
-    if (!data.by_provider || !data.by_provider.length) return;
+    if (!data.by_provider || !data.by_provider.length) { clearChart('#chart-by-provider'); return; }
 
     renderChart('#chart-by-provider', {
         chart: { type: 'donut', height: 250 },
@@ -262,7 +272,7 @@ function renderByProvider(data) {
 
 // Usage by Agent - bar
 function renderByAgent(data) {
-    if (!data.by_agent || !data.by_agent.length) return;
+    if (!data.by_agent || !data.by_agent.length) { clearChart('#chart-by-agent'); return; }
 
     renderChart('#chart-by-agent', {
         chart: { type: 'bar', height: 250 },
@@ -278,6 +288,66 @@ function renderByAgent(data) {
         },
         plotOptions: {
             bar: { borderRadius: 2, columnWidth: '50%' },
+        },
+        dataLabels: { enabled: false },
+    });
+}
+
+// Tool Usage - horizontal bar
+function renderToolCounts(data) {
+    if (!data.by_tool || !data.by_tool.length) { clearChart('#chart-tools'); return; }
+
+    const tools = data.by_tool.map(d => d.tool);
+    const counts = data.by_tool.map(d => d.count);
+
+    renderChart('#chart-tools', {
+        chart: { type: 'bar', height: Math.max(250, tools.length * 28) },
+        series: [{ name: 'calls', data: counts }],
+        colors: ['#00ffff'],
+        plotOptions: {
+            bar: { horizontal: true, borderRadius: 2, barHeight: '60%' },
+        },
+        xaxis: {
+            categories: tools,
+            labels: {
+                style: { colors: '#005a15', fontSize: '10px' },
+                formatter: val => formatNumber(val),
+            },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#00aa2a', fontSize: '10px' },
+                maxWidth: 160,
+            },
+        },
+        dataLabels: { enabled: false },
+    });
+}
+
+// Tool Usage Over Time - stacked bar
+function renderToolTimeline(data) {
+    if (!data.over_time || !data.over_time.length) { clearChart('#chart-tools-timeline'); return; }
+
+    const dates = data.over_time.map(d => d.date);
+    const allKeys = Object.keys(data.over_time[0]).filter(k => k !== 'date' && k !== 'total');
+
+    if (!allKeys.length) { clearChart('#chart-tools-timeline'); return; }
+
+    const series = allKeys.map((tool, i) => ({
+        name: tool,
+        data: data.over_time.map(d => d[tool] || 0),
+    }));
+
+    renderChart('#chart-tools-timeline', {
+        chart: { type: 'bar', height: 280, stacked: true },
+        series: series,
+        colors: COLORS.slice(0, allKeys.length),
+        xaxis: {
+            categories: dates,
+            labels: { style: { colors: '#005a15', fontSize: '10px' } },
+        },
+        plotOptions: {
+            bar: { borderRadius: 2, columnWidth: '60%' },
         },
         dataLabels: { enabled: false },
     });

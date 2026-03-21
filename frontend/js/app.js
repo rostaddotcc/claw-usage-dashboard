@@ -62,12 +62,13 @@ async function refresh() {
     const params = { period: currentPeriod, granularity: getGranularity(currentPeriod) };
 
     try {
-        const [overview, usage, cache, errors, sessions] = await Promise.all([
+        const [overview, usage, cache, errors, sessions, tools] = await Promise.all([
             API.overview(params),
             API.usage(params),
             API.cache(params),
             API.errors(params),
             API.sessions(params),
+            API.tools(params),
         ]);
 
         updateCards(overview);
@@ -77,6 +78,8 @@ async function refresh() {
         renderErrors(errors);
         renderByProvider(usage);
         renderByAgent(usage);
+        renderToolCounts(tools);
+        renderToolTimeline(tools);
         updateTable(sessions);
     } catch (err) {
         console.error('fetch error:', err);
