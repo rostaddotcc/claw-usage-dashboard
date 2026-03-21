@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claw Usage Dashboard</title>
-    <link rel="stylesheet" href="/css/style.css?v=5">
+    <link rel="stylesheet" href="/css/style.css?v=6">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 <body>
@@ -113,6 +113,27 @@
 
         <section class="table-section collapsible">
             <div class="chart-title collapsible-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <span class="toggle-arrow">▶</span> Stop Reasons <span class="session-count" id="error-count"></span>
+            </div>
+            <div class="collapsible-content">
+                <div class="table-wrap">
+                    <table id="errors-table">
+                        <thead>
+                            <tr>
+                                <th>REASON</th>
+                                <th>COUNT</th>
+                                <th>%</th>
+                                <th>STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="errors-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="table-section collapsible">
+            <div class="chart-title collapsible-toggle" onclick="this.parentElement.classList.toggle('open')">
                 <span class="toggle-arrow">▶</span> Sessions <span class="session-count" id="session-count"></span>
             </div>
             <div class="collapsible-content">
@@ -141,8 +162,8 @@
         <span class="prompt">></span> ready<span class="cursor">_</span>
     </footer>
 
-    <script src="/js/api.js?v=5"></script>
-    <script src="/js/charts.js?v=5"></script>
-    <script src="/js/app.js?v=5"></script>
+    <script src="/js/api.js?v=6"></script>
+    <script src="/js/charts.js?v=6"></script>
+    <script src="/js/app.js?v=6"></script>
 </body>
 </html>

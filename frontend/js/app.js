@@ -26,14 +26,27 @@ function fmtDuration(min) {
     return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
 }
 
+// Trend indicator: returns HTML span with arrow and percentage change
+function trend(current, previous, invert) {
+    if (previous == null || previous === 0) return '';
+    const diff = ((current - previous) / previous) * 100;
+    if (Math.abs(diff) < 0.5) return '';
+    const up = diff > 0;
+    const good = invert ? !up : up;
+    const arrow = up ? '▲' : '▼';
+    const cls = good ? 'trend-good' : 'trend-bad';
+    return ` <span class="trend ${cls}">${arrow}${Math.abs(diff).toFixed(0)}%</span>`;
+}
+
 // Update summary cards
 function updateCards(overview) {
-    document.getElementById('card-tokens').textContent = fmtTokens(overview.total_tokens);
-    document.getElementById('card-messages').textContent = overview.total_messages;
-    document.getElementById('card-sessions').textContent = overview.total_sessions;
-    document.getElementById('card-cache').textContent = overview.cache_hit_rate + '%';
-    document.getElementById('card-errors').textContent = overview.error_rate + '%';
-    document.getElementById('card-cost').textContent = '$' + overview.total_cost.toFixed(2);
+    const p = overview.previous;
+    document.getElementById('card-tokens').innerHTML = fmtTokens(overview.total_tokens) + trend(overview.total_tokens, p?.total_tokens);
+    document.getElementById('card-messages').innerHTML = overview.total_messages + trend(overview.total_messages, p?.total_messages);
+    document.getElementById('card-sessions').innerHTML = overview.total_sessions + trend(overview.total_sessions, p?.total_sessions);
+    document.getElementById('card-cache').innerHTML = overview.cache_hit_rate + '%' + trend(overview.cache_hit_rate, p?.cache_hit_rate);
+    document.getElementById('card-errors').innerHTML = overview.error_rate + '%' + trend(overview.error_rate, p?.error_rate, true);
+    document.getElementById('card-cost').innerHTML = '$' + overview.total_cost.toFixed(2) + trend(overview.total_cost, p?.total_cost, true);
 }
 
 // Session table sorting
@@ -110,6 +123,35 @@ function updateTable(data) {
     renderTableRows(sortSessions(data.sessions, sessionSort.key, sessionSort.asc));
 }
 
+// Update error codes table
+function updateErrorTable(data) {
+    const tbody = document.getElementById('errors-body');
+    const countEl = document.getElementById('error-count');
+    const reasons = data.stop_reasons || {};
+    const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((s, e) => s + e[1], 0);
+
+    if (countEl) countEl.textContent = `(${entries.length})`;
+
+    if (!entries.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">no data</td></tr>';
+        return;
+    }
+
+    const normal = new Set(['endTurn', 'end_turn', 'stop', 'toolUse', 'tool_use']);
+    tbody.innerHTML = entries.map(([reason, count]) => {
+        const pct = (count / total * 100).toFixed(1);
+        const isError = !normal.has(reason);
+        const cls = isError ? 'style="color:var(--accent-red)"' : '';
+        return `<tr>
+            <td ${cls}>${reason}</td>
+            <td>${count}</td>
+            <td>${pct}%</td>
+            <td>${isError ? 'ERROR' : 'OK'}</td>
+        </tr>`;
+    }).join('');
+}
+
 // Determine chart granularity based on period
 function getGranularity(period) {
     if (period === 'hour') return 'minute';
@@ -144,6 +186,7 @@ async function refresh() {
         renderByModel(usage);
         renderCache(cache);
         renderErrors(errors);
+        updateErrorTable(errors);
         renderByProvider(usage);
         renderByAgent(usage);
         renderToolCounts(tools);
