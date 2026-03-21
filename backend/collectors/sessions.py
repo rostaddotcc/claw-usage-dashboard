@@ -123,6 +123,13 @@ class SessionCollector(BaseCollector):
         total = usage.get("totalTokens", 0) or (input_t + output_t + cache_read + cache_write)
         cost = usage.get("cost", {})
 
+        tools = []
+        content = msg.get("content") or entry.get("content") or []
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") in ("tool_use", "toolCall"):
+                    tools.append(block.get("name", "unknown"))
+
         return {
             "agent": "cron",
             "session_id": session_id,
@@ -142,7 +149,7 @@ class SessionCollector(BaseCollector):
             "cost_cache_read": cost.get("cacheRead", 0) or cost.get("cache_read", 0),
             "cost_cache_write": cost.get("cacheWrite", 0) or cost.get("cache_write", 0),
             "cost_total": cost.get("total", 0),
-            "tools": [],
+            "tools": tools,
         }
 
     def _parse_line(self, line: str, agent: str, session_id: str) -> dict[str, Any] | None:

@@ -202,6 +202,40 @@ main {
     margin-bottom: 1.5rem;
 }
 
+.collapsible .collapsible-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.collapsible .collapsible-toggle:hover {
+    color: var(--text-primary);
+}
+
+.collapsible .toggle-arrow {
+    display: inline-block;
+    transition: transform 0.2s;
+    font-size: 0.7em;
+    margin-right: 0.3rem;
+}
+
+.collapsible.open .toggle-arrow {
+    transform: rotate(90deg);
+}
+
+.collapsible .collapsible-content {
+    display: none;
+}
+
+.collapsible.open .collapsible-content {
+    display: block;
+}
+
+.session-count {
+    color: var(--text-muted);
+    font-size: 0.8em;
+    margin-left: 0.5rem;
+}
+
 .table-wrap {
     overflow-x: auto;
     margin-top: 0.5rem;

@@ -98,23 +98,27 @@
             </div>
         </section>
 
-        <section class="table-section">
-            <div class="chart-title">> Sessions</div>
-            <div class="table-wrap">
-                <table id="sessions-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>AGENT</th>
-                            <th>MODEL</th>
-                            <th>TOKENS</th>
-                            <th>MSGS</th>
-                            <th>COST</th>
-                            <th>TIME</th>
-                        </tr>
-                    </thead>
-                    <tbody id="sessions-body"></tbody>
-                </table>
+        <section class="table-section collapsible">
+            <div class="chart-title collapsible-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <span class="toggle-arrow">▶</span> Sessions <span class="session-count" id="session-count"></span>
+            </div>
+            <div class="collapsible-content">
+                <div class="table-wrap">
+                    <table id="sessions-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>AGENT</th>
+                                <th>MODEL</th>
+                                <th>TOKENS</th>
+                                <th>MSGS</th>
+                                <th>COST</th>
+                                <th>TIME</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessions-body"></tbody>
+                    </table>
+                </div>
             </div>
         </section>
     </main>

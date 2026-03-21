@@ -34,6 +34,9 @@ function updateTable(data) {
         return;
     }
 
+    const countEl = document.getElementById('session-count');
+    if (countEl) countEl.textContent = `(${data.sessions.length})`;
+
     tbody.innerHTML = data.sessions.map(s => `
         <tr>
             <td>${s.session_id}</td>
