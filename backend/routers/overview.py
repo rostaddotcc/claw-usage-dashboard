@@ -19,6 +19,12 @@ def _period_to_dates(period: str) -> dict:
         return {"start_date": (now - timedelta(weeks=1)).isoformat()}
     elif period == "month":
         return {"start_date": (now - timedelta(days=30)).isoformat()}
+    elif period == "quarter":
+        return {"start_date": (now - timedelta(days=90)).isoformat()}
+    elif period == "half":
+        return {"start_date": (now - timedelta(days=180)).isoformat()}
+    elif period == "year":
+        return {"start_date": (now - timedelta(days=365)).isoformat()}
     return {}
 
 

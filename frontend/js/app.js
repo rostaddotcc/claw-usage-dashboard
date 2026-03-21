@@ -56,6 +56,9 @@ function getGranularity(period) {
     if (period === 'day') return 'hour';
     if (period === 'week') return 'day';
     if (period === 'month') return 'day';
+    if (period === 'quarter') return 'week';
+    if (period === 'half') return 'week';
+    if (period === 'year') return 'month';
     return 'week';
 }
 
