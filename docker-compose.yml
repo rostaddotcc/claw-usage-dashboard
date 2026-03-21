@@ -1,0 +1,11 @@
+services:
+  molt:
+    build: .
+    container_name: claw-usage-dashboard
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - /home/rostads/.openclaw:/data:ro
+    environment:
+      - DATA_DIR=/data
