@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query
 
 from backend.collectors.sessions import collector
 from backend.routers.overview import _period_to_dates
-from backend.aggregators.errors import error_rate, stop_reason_distribution, errors_over_time
+from backend.aggregators.errors import error_rate, stop_reason_distribution, errors_by_model, errors_over_time
 
 router = APIRouter()
 
@@ -28,5 +28,6 @@ def get_errors(
     return {
         "error_rate": error_rate(records),
         "stop_reasons": stop_reason_distribution(records),
+        "by_model": errors_by_model(records),
         "over_time": errors_over_time(records, granularity),
     }

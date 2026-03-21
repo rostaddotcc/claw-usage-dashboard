@@ -18,6 +18,29 @@ def stop_reason_distribution(records: list[dict[str, Any]]) -> dict[str, int]:
     return dict(counts.most_common())
 
 
+def errors_by_model(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, dict] = defaultdict(lambda: {"total": 0, "errors": 0, "reasons": Counter()})
+    for r in records:
+        g = groups[r["model"]]
+        g["total"] += 1
+        if r["stop_reason"] not in NORMAL_STOP_REASONS:
+            g["errors"] += 1
+            g["reasons"][r["stop_reason"]] += 1
+
+    result = []
+    for model, g in sorted(groups.items()):
+        rate = round(g["errors"] / g["total"] * 100, 1) if g["total"] > 0 else 0.0
+        result.append({
+            "model": model,
+            "total": g["total"],
+            "errors": g["errors"],
+            "error_rate": rate,
+            "reasons": dict(g["reasons"].most_common()),
+        })
+    result.sort(key=lambda x: x["errors"], reverse=True)
+    return result
+
+
 def errors_over_time(records: list[dict[str, Any]], granularity: str = "day") -> list[dict[str, Any]]:
     groups: dict[str, dict] = defaultdict(lambda: {"total": 0, "errors": 0})
     for r in records:

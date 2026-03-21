@@ -150,6 +150,23 @@ function updateErrorTable(data) {
             <td>${isError ? 'ERROR' : 'OK'}</td>
         </tr>`;
     }).join('');
+
+    // Errors by model
+    const modelBody = document.getElementById('errors-by-model-body');
+    const models = (data.by_model || []).filter(m => m.errors > 0);
+    if (!models.length) {
+        modelBody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">no errors</td></tr>';
+        return;
+    }
+    modelBody.innerHTML = models.map(m => {
+        const reasons = Object.entries(m.reasons).map(([r, c]) => `${r}(${c})`).join(', ');
+        return `<tr>
+            <td>${m.model}</td>
+            <td style="color:var(--accent-red)">${m.errors}</td>
+            <td>${m.error_rate}%</td>
+            <td style="font-size:0.7rem">${reasons}</td>
+        </tr>`;
+    }).join('');
 }
 
 // Determine chart granularity based on period
