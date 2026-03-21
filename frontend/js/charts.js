@@ -106,6 +106,9 @@ function renderTimeline(data) {
         plotOptions: {
             bar: { borderRadius: 2, columnWidth: '60%' },
         },
+        tooltip: {
+            y: { formatter: val => val.toLocaleString('sv-SE') + ' tokens' },
+        },
         dataLabels: { enabled: false },
     });
 }
@@ -140,6 +143,9 @@ function renderByModel(data) {
                 maxWidth: 160,
                 formatter: val => val,
             },
+        },
+        tooltip: {
+            y: { formatter: val => val.toLocaleString('sv-SE') + ' tokens' },
         },
         dataLabels: { enabled: false },
     });
@@ -326,49 +332,80 @@ function renderToolCounts(data) {
     });
 }
 
-// Session Duration - bar chart
+function fmtMinutes(val) {
+    if (val < 1) return '<1m';
+    if (val < 60) return Math.round(val) + 'm';
+    const h = Math.floor(val / 60);
+    const m = Math.round(val % 60);
+    return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
+}
+
+// Session Duration - avg per day area chart with individual session scatter
 function renderDuration(data) {
     if (!data.sessions || !data.sessions.length) { clearChart('#chart-duration'); return; }
 
     const sessions = data.sessions
-        .filter(s => s.duration_minutes != null && s.duration_minutes > 0)
-        .slice(0, 50);
+        .filter(s => s.duration_minutes != null && s.duration_minutes > 0 && s.start_time);
 
     if (!sessions.length) { clearChart('#chart-duration'); return; }
 
+    // Group by day for averages
+    const byDay = {};
+    for (const s of sessions) {
+        const day = s.start_time.slice(0, 10);
+        if (!byDay[day]) byDay[day] = [];
+        byDay[day].push(s.duration_minutes);
+    }
+    const days = Object.keys(byDay).sort();
+    const avgData = days.map(d => {
+        const vals = byDay[d];
+        return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    });
+
+    // Scatter: individual sessions as points
+    const scatterData = sessions.map(s => ({
+        x: s.start_time.slice(0, 10),
+        y: Math.round(s.duration_minutes),
+    }));
+
+    // Stats for title
+    const allDurations = sessions.map(s => s.duration_minutes);
+    const avg = Math.round(allDurations.reduce((a, b) => a + b, 0) / allDurations.length);
+    const sorted = [...allDurations].sort((a, b) => a - b);
+    const median = Math.round(sorted[Math.floor(sorted.length / 2)]);
+
+    // Update title with stats
+    const titleEl = document.querySelector('#chart-duration')?.closest('.chart-box')?.querySelector('.chart-title');
+    if (titleEl) titleEl.textContent = `> Session Duration (avg ${fmtMinutes(avg)} · median ${fmtMinutes(median)} · ${sessions.length} sessions)`;
+
     renderChart('#chart-duration', {
-        chart: { type: 'bar', height: 280 },
-        series: [{ name: 'duration', data: sessions.map(s => Math.round(s.duration_minutes)) }],
-        colors: ['#aa55ff'],
+        chart: { type: 'line', height: 280 },
+        series: [
+            { name: 'avg/day', type: 'area', data: avgData },
+            { name: 'sessions', type: 'scatter', data: scatterData },
+        ],
+        colors: ['#aa55ff', 'rgba(170,85,255,0.4)'],
         xaxis: {
-            categories: sessions.map(s => s.agent + '/' + s.session_id),
-            labels: { style: { colors: '#005a15', fontSize: '9px' }, rotate: -45, maxHeight: 60 },
+            categories: days,
+            labels: { style: { colors: '#005a15', fontSize: '10px' } },
         },
         yaxis: {
             labels: {
                 style: { colors: '#005a15', fontSize: '10px' },
-                formatter: val => {
-                    if (val < 60) return Math.round(val) + 'm';
-                    const h = Math.floor(val / 60);
-                    const m = Math.round(val % 60);
-                    return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
-                },
+                formatter: val => fmtMinutes(val),
             },
         },
-        plotOptions: {
-            bar: { borderRadius: 2, columnWidth: '60%' },
+        stroke: { width: [2, 0], curve: 'smooth' },
+        fill: {
+            type: ['gradient', 'solid'],
+            gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05, stops: [0, 100] },
         },
+        markers: { size: [0, 3], strokeWidth: 0 },
         tooltip: {
-            y: {
-                formatter: val => {
-                    if (val < 60) return Math.round(val) + ' min';
-                    const h = Math.floor(val / 60);
-                    const m = Math.round(val % 60);
-                    return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
-                },
-            },
+            y: { formatter: val => fmtMinutes(val) },
         },
         dataLabels: { enabled: false },
+        legend: { show: true },
     });
 }
 

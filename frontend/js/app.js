@@ -38,12 +38,16 @@ function trend(current, previous, invert) {
     return ` <span class="trend ${cls}">${arrow}${Math.abs(diff).toFixed(0)}%</span>`;
 }
 
+function fmtCount(n) {
+    return n.toLocaleString('sv-SE');
+}
+
 // Update summary cards
 function updateCards(overview) {
     const p = overview.previous;
     document.getElementById('card-tokens').innerHTML = fmtTokens(overview.total_tokens) + trend(overview.total_tokens, p?.total_tokens);
-    document.getElementById('card-messages').innerHTML = overview.total_messages + trend(overview.total_messages, p?.total_messages);
-    document.getElementById('card-sessions').innerHTML = overview.total_sessions + trend(overview.total_sessions, p?.total_sessions);
+    document.getElementById('card-messages').innerHTML = fmtCount(overview.total_messages) + trend(overview.total_messages, p?.total_messages);
+    document.getElementById('card-sessions').innerHTML = fmtCount(overview.total_sessions) + trend(overview.total_sessions, p?.total_sessions);
     document.getElementById('card-cache').innerHTML = overview.cache_hit_rate + '%' + trend(overview.cache_hit_rate, p?.cache_hit_rate);
     document.getElementById('card-errors').innerHTML = overview.error_rate + '%' + trend(overview.error_rate, p?.error_rate, true);
     document.getElementById('card-cost').innerHTML = '$' + overview.total_cost.toFixed(2) + trend(overview.total_cost, p?.total_cost, true);
