@@ -1,6 +1,27 @@
-let currentPeriod = 'all';
-let currentModel = '';
-let currentAgent = '';
+// Restore filter state from URL
+const _params = new URLSearchParams(location.search);
+let currentPeriod = _params.get('period') || 'all';
+let currentModel = _params.get('model') || '';
+let currentAgent = _params.get('agent') || '';
+let allModels = [];
+let allAgents = [];
+let refreshInterval = null;
+
+function updateURL() {
+    const p = new URLSearchParams();
+    if (currentPeriod !== 'all') p.set('period', currentPeriod);
+    if (currentModel) p.set('model', currentModel);
+    if (currentAgent) p.set('agent', currentAgent);
+    const qs = p.toString();
+    history.replaceState(null, '', qs ? '?' + qs : location.pathname);
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1500);
+}
 
 // Escape HTML special characters to prevent XSS
 function esc(s) {
@@ -106,12 +127,12 @@ function renderTableRows(sessions) {
 
     tbody.innerHTML = page.map(s => `
         <tr>
-            <td>${esc(s.session_id)}</td>
+            <td class="session-id" data-sid="${esc(s.session_id)}" title="${esc(s.session_id)}">${esc(s.session_id.slice(0, 8))}\u2026</td>
             <td>${esc(s.agent)}</td>
             <td>${esc(s.models_used.join(', '))}</td>
             <td>${fmtTokens(s.total_tokens)}</td>
             <td>${s.message_count}</td>
-            <td>$${s.cost.toFixed(2)}</td>
+            <td>${s.cost != null ? '$' + s.cost.toFixed(2) : '--'}</td>
             <td>${fmtDuration(s.duration_minutes)}</td>
             <td>${fmtDate(s.start_time)}</td>
         </tr>
@@ -257,24 +278,28 @@ async function refresh() {
     }
 }
 
-// Update model filter dropdown (only when no model filter is active, to preserve full list)
+// Update model filter dropdown — cache full list so filtered responses don't shrink it
 function updateModelFilter(usage) {
-    if (currentModel) return;
     const select = document.getElementById('model-filter');
     const models = (usage.by_model || []).map(d => d.model).sort();
+    if (!currentModel) allModels = models;
+    const list = allModels.length ? allModels : models;
     const options = '<option value="">ALL MODELS</option>' +
-        models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+        list.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
     select.innerHTML = options;
+    if (currentModel) select.value = currentModel;
 }
 
-// Update agent filter dropdown
+// Update agent filter dropdown — cache full list so filtered responses don't shrink it
 function updateAgentFilter(overview) {
-    if (currentAgent) return;
     const select = document.getElementById('agent-filter');
     const agents = overview.agents || [];
+    if (!currentAgent) allAgents = agents;
+    const list = allAgents.length ? allAgents : agents;
     const options = '<option value="">ALL AGENTS</option>' +
-        agents.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+        list.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
     select.innerHTML = options;
+    if (currentAgent) select.value = currentAgent;
 }
 
 // Session table column sort handler
@@ -297,12 +322,14 @@ document.getElementById('sessions-table').querySelector('thead').addEventListene
 // Model filter change handler
 document.getElementById('model-filter').addEventListener('change', (e) => {
     currentModel = e.target.value;
+    updateURL();
     refresh();
 });
 
 // Agent filter change handler
 document.getElementById('agent-filter').addEventListener('change', (e) => {
     currentAgent = e.target.value;
+    updateURL();
     refresh();
 });
 
@@ -344,7 +371,31 @@ document.getElementById('period-filter').addEventListener('click', (e) => {
     document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
     currentPeriod = e.target.dataset.period;
+    updateURL();
     refresh();
+});
+
+// Auto-refresh handler
+document.getElementById('auto-refresh').addEventListener('change', (e) => {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = null;
+    const seconds = parseInt(e.target.value);
+    if (seconds > 0) {
+        refreshInterval = setInterval(refresh, seconds * 1000);
+    }
+});
+
+// Click-to-copy session ID
+document.getElementById('sessions-body').addEventListener('click', (e) => {
+    const td = e.target.closest('.session-id');
+    if (!td) return;
+    const sid = td.dataset.sid;
+    navigator.clipboard.writeText(sid).then(() => showToast('copied: ' + sid));
+});
+
+// Restore active period button from URL
+document.querySelectorAll('.period-filter button').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === currentPeriod);
 });
 
 // Initial load

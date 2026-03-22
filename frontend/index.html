@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claw Usage Dashboard</title>
-    <link rel="stylesheet" href="/css/style.css?v=11">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/css/style.css?v=12">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 <body>
@@ -37,6 +38,14 @@
                 <button data-period="half">6M</button>
                 <button data-period="year">12M</button>
                 <button data-period="all" class="active">ALL</button>
+            </div>
+            <div class="auto-refresh">
+                <select id="auto-refresh">
+                    <option value="0">&#x27f3; OFF</option>
+                    <option value="30">&#x27f3; 30s</option>
+                    <option value="60">&#x27f3; 60s</option>
+                    <option value="300">&#x27f3; 5m</option>
+                </select>
             </div>
         </div>
     </header>
@@ -208,8 +217,9 @@
         <span class="prompt">></span> ready<span class="cursor">_</span>
     </footer>
 
-    <script src="/js/api.js?v=11"></script>
-    <script src="/js/charts.js?v=11"></script>
-    <script src="/js/app.js?v=11"></script>
+    <div id="toast" class="toast"></div>
+    <script src="/js/api.js?v=12"></script>
+    <script src="/js/charts.js?v=12"></script>
+    <script src="/js/app.js?v=12"></script>
 </body>
 </html>

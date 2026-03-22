@@ -41,7 +41,7 @@ body {
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 1000;
+    z-index: 10;
     background: repeating-linear-gradient(
         0deg,
         transparent,
@@ -95,7 +95,8 @@ h1 {
 }
 
 .agent-filter select,
-.model-filter select {
+.model-filter select,
+.auto-refresh select {
     font-family: inherit;
     font-size: 0.75rem;
     padding: 0.35rem 0.7rem;
@@ -111,13 +112,16 @@ h1 {
 .agent-filter select:hover,
 .agent-filter select:focus,
 .model-filter select:hover,
-.model-filter select:focus {
+.model-filter select:focus,
+.auto-refresh select:hover,
+.auto-refresh select:focus {
     color: var(--text-primary);
     border-color: var(--border-bright);
 }
 
 .agent-filter select option,
-.model-filter select option {
+.model-filter select option,
+.auto-refresh select option {
     background: var(--bg-card);
     color: var(--text-dim);
 }
@@ -450,6 +454,76 @@ footer {
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
+}
+
+/* Session ID - truncated, clickable */
+.session-id {
+    cursor: pointer;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+}
+
+.session-id:hover {
+    color: var(--text-primary) !important;
+    text-decoration: underline;
+}
+
+/* Toast notification */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    background: var(--bg-card);
+    border: 1px solid var(--text-primary);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 1100;
+    text-shadow: var(--glow);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Loading skeleton for empty chart containers */
+.chart-box > div:not(.chart-title):empty {
+    min-height: 200px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-alt) 50%, var(--bg-card) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.loading .chart-box {
+    animation: border-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes border-pulse {
+    0%, 100% { border-color: var(--border); }
+    50% { border-color: var(--border-bright); }
+}
+
+/* ApexCharts tooltips above scanlines */
+.apexcharts-tooltip,
+.apexcharts-yaxistooltip,
+.apexcharts-xaxistooltip {
+    z-index: 11 !important;
 }
 
 /* Responsive */
