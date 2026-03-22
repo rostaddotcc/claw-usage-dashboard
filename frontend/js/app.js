@@ -13,6 +13,10 @@ function updateURL() {
     if (currentPeriod !== 'all') p.set('period', currentPeriod);
     if (currentModel) p.set('model', currentModel);
     if (currentAgent) p.set('agent', currentAgent);
+    const df = document.getElementById('date-from')?.value;
+    const dt = document.getElementById('date-to')?.value;
+    if (df) p.set('from', df);
+    if (dt) p.set('to', dt);
     const qs = p.toString();
     history.replaceState(null, '', qs ? '?' + qs : location.pathname);
 }
@@ -308,7 +312,11 @@ function getGranularity(period) {
 // Fetch all data and render
 async function refresh() {
     document.body.classList.add('loading');
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo = document.getElementById('date-to').value;
     const params = { period: currentPeriod, granularity: getGranularity(currentPeriod) };
+    if (dateFrom) params.start_date = dateFrom + 'T00:00:00+00:00';
+    if (dateTo) params.end_date = dateTo + 'T23:59:59+00:00';
     if (currentModel) params.model = currentModel;
     if (currentAgent) params.agent = currentAgent;
 
@@ -472,6 +480,34 @@ document.getElementById('period-filter').addEventListener('click', (e) => {
     document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
     currentPeriod = e.target.dataset.period;
+    // Clear custom date range when using period buttons
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value = '';
+    updateURL();
+    refresh();
+});
+
+// Date range filter handlers
+document.getElementById('date-from').addEventListener('change', () => {
+    // Deactivate period buttons when custom dates are set
+    document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
+    currentPeriod = 'all';
+    updateURL();
+    refresh();
+});
+document.getElementById('date-to').addEventListener('change', () => {
+    document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
+    currentPeriod = 'all';
+    updateURL();
+    refresh();
+});
+document.getElementById('date-clear').addEventListener('click', () => {
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value = '';
+    // Re-activate ALL button
+    document.querySelectorAll('.period-filter button').forEach(b => {
+        b.classList.toggle('active', b.dataset.period === currentPeriod);
+    });
     updateURL();
     refresh();
 });
@@ -713,10 +749,17 @@ document.getElementById('export-csv').addEventListener('click', exportCSV);
 document.getElementById('export-md').addEventListener('click', exportMD);
 document.getElementById('export-xlsx').addEventListener('click', exportXLSX);
 
-// Restore active period button from URL
+// Restore active period button and date range from URL
 document.querySelectorAll('.period-filter button').forEach(b => {
     b.classList.toggle('active', b.dataset.period === currentPeriod);
 });
+const _fromParam = _params.get('from');
+const _toParam = _params.get('to');
+if (_fromParam) document.getElementById('date-from').value = _fromParam;
+if (_toParam) document.getElementById('date-to').value = _toParam;
+if (_fromParam || _toParam) {
+    document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
+}
 
 // Initial load
 refresh();

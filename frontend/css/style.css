@@ -457,6 +457,54 @@ footer {
     50% { opacity: 0; }
 }
 
+/* Date range filter */
+.date-range {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+.date-range input[type="date"] {
+    font-family: inherit;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.4rem;
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    outline: none;
+    cursor: pointer;
+    color-scheme: dark;
+}
+
+.date-range input[type="date"]:hover,
+.date-range input[type="date"]:focus {
+    color: var(--text-primary);
+}
+
+.date-sep {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+}
+
+.date-range button {
+    font-family: inherit;
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.date-range button:hover {
+    color: var(--accent-red);
+}
+
 /* No data state */
 .no-data {
     display: flex;

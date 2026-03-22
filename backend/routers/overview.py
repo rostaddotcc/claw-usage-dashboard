@@ -20,7 +20,12 @@ PERIOD_DELTAS = {
 }
 
 
-def _period_to_dates(period: str) -> dict:
+def _period_to_dates(period: str, start_date: str | None = None, end_date: str | None = None) -> dict:
+    if start_date:
+        result = {"start_date": start_date}
+        if end_date:
+            result["end_date"] = end_date
+        return result
     now = datetime.now(timezone.utc)
     delta = PERIOD_DELTAS.get(period)
     if delta:
@@ -45,8 +50,10 @@ def get_overview(
     agent: str | None = Query(None),
     model: str | None = Query(None),
     provider: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
 ):
-    filters = _period_to_dates(period)
+    filters = _period_to_dates(period, start_date, end_date)
     if agent:
         filters["agent"] = agent
     if model:

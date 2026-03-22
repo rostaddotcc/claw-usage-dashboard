@@ -18,8 +18,10 @@ def get_tools(
     model: str | None = Query(None),
     provider: str | None = Query(None),
     granularity: str = Query("day"),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
 ):
-    filters = _period_to_dates(period)
+    filters = _period_to_dates(period, start_date, end_date)
     if agent:
         filters["agent"] = agent
     if model:

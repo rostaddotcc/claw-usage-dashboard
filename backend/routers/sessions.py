@@ -14,8 +14,10 @@ def get_sessions(
     agent: str | None = Query(None),
     model: str | None = Query(None),
     provider: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
 ):
-    filters = _period_to_dates(period)
+    filters = _period_to_dates(period, start_date, end_date)
     if agent:
         filters["agent"] = agent
     if model:
