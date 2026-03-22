@@ -31,6 +31,8 @@ There are no tests, linters, or build steps configured.
 
 Note: the docker-compose service and `BaseCollector` docstring still reference "Molt", a legacy name for this project.
 
+**Cloudflare warning**: If the site is behind Cloudflare with Rocket Loader enabled, it rewrites all `<script>` tags and inline `onclick` handlers, which can break JS execution. The site works best with Rocket Loader disabled or Cloudflare proxy off.
+
 ## Architecture
 
 Data flows through a three-layer pipeline:
@@ -115,11 +117,25 @@ All `/api/*` endpoints accept: `period` (hour/day/week/month/quarter/half/year/a
 
 Single-page HTML with no build step (`lang="sv"`). Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Date/time formatting uses `sv-SE` locale. Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering).
 
-The header contains a model filter dropdown (populated from usage data) and period buttons (1H/1D/7D/30D/3M/6M/12M/ALL). Both filters trigger a full data refresh. The sessions table is collapsible (closed by default, toggled via CSS class `open` on the `.collapsible` section).
+The header is centered with controls stacked below the title. It contains: agent filter, model filter, period buttons (1H/1D/7D/30D/3M/6M/12M/ALL), auto-refresh dropdown (OFF/30s/60s/5m), and export buttons (.csv/.md/.xlsx). All filters trigger a full data refresh and persist to URL query params via `history.replaceState` — filters survive page refreshes and are shareable.
+
+The model and agent filter dropdowns cache the full option list in `allModels`/`allAgents` so that filtering by one model doesn't shrink the dropdown to only that model's data.
 
 All charts go through `renderChart(id, options)` which destroys the previous instance (tracked in `chartInstances`) and deep-merges `CHART_DEFAULTS` (terminal theme colors, fonts) with the per-chart options. To add a new chart: call `renderChart('#my-chart', { ... })` — the theme is applied automatically. When data is empty, `clearChart(id)` destroys the chart and shows a "no data" message.
 
-Script tags and the CSS link include `?v=N` cache-busting parameters — bump these when deploying frontend changes.
+All user-controlled data rendered via `innerHTML` is escaped through the `esc()` function to prevent stored XSS from malicious JSONL content. Session IDs are truncated to 8 characters with click-to-copy (uses `navigator.clipboard` + toast notification).
+
+Script tags and the CSS link include `?v=N` cache-busting parameters — bump these when deploying frontend changes. The frontend also loads SheetJS (`xlsx.mini.min.js`) from CDN for Excel export.
+
+### Data export
+
+Three export formats are available via header buttons. All exports include the active filter context (period/agent/model) and pull from `lastData` (stored after each `refresh()` call):
+
+- **CSV**: BOM-prefixed UTF-8 with summary metrics, sessions, usage by model, and tool counts
+- **Markdown**: Formatted tables suitable for pasting into GitHub issues or docs
+- **XLSX**: Multi-sheet workbook (Summary, Sessions, By Model, By Provider, By Agent, Tools) via SheetJS
+
+Export filenames follow the pattern `claw-{period}-{date}.{ext}`.
 
 ### Error classification
 

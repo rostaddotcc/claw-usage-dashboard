@@ -181,50 +181,116 @@ function updateTable(data) {
     renderTableRows(sortSessions(data.sessions, sessionSort.key, sessionSort.asc));
 }
 
+// Stop reasons table — sortable
+const STOP_REASON_COLS = [
+    { key: 'reason', type: 'string' },
+    { key: 'count', type: 'number' },
+    { key: 'pct', type: 'number' },
+    { key: 'status', type: 'string' },
+];
+let stopReasonSort = { key: 'count', asc: false };
+let lastStopReasonRows = null;
+
+const NORMAL_STOPS = new Set(['endTurn', 'end_turn', 'stop', 'toolUse', 'tool_use']);
+
+function renderStopReasonRows(rows) {
+    const tbody = document.getElementById('errors-body');
+    const sorted = [...rows].sort((a, b) => {
+        const col = STOP_REASON_COLS.find(c => c.key === stopReasonSort.key);
+        let va = a[stopReasonSort.key], vb = b[stopReasonSort.key];
+        if (col.type === 'string') return stopReasonSort.asc ? va.localeCompare(vb) : vb.localeCompare(va);
+        return stopReasonSort.asc ? va - vb : vb - va;
+    });
+    tbody.innerHTML = sorted.map(r => {
+        const cls = r.isError ? 'style="color:var(--accent-red)"' : '';
+        return `<tr>
+            <td ${cls}>${esc(r.reason)}</td>
+            <td>${r.count}</td>
+            <td>${r.pct}%</td>
+            <td>${r.isError ? 'ERROR' : 'OK'}</td>
+        </tr>`;
+    }).join('');
+    document.querySelectorAll('#stop-reasons-table th').forEach((th, i) => {
+        const col = STOP_REASON_COLS[i];
+        th.classList.toggle('sorted', col.key === stopReasonSort.key);
+        th.classList.toggle('asc', col.key === stopReasonSort.key && stopReasonSort.asc);
+        th.classList.toggle('desc', col.key === stopReasonSort.key && !stopReasonSort.asc);
+    });
+}
+
+// Errors by model table — sortable
+const ERROR_MODEL_COLS = [
+    { key: 'model', type: 'string' },
+    { key: 'errors', type: 'number' },
+    { key: 'error_rate', type: 'number' },
+    { key: 'reasons_str', type: 'string' },
+];
+let errorModelSort = { key: 'errors', asc: false };
+let lastErrorModelRows = null;
+
+function renderErrorModelRows(rows) {
+    const modelBody = document.getElementById('errors-by-model-body');
+    const sorted = [...rows].sort((a, b) => {
+        const col = ERROR_MODEL_COLS.find(c => c.key === errorModelSort.key);
+        let va = a[errorModelSort.key], vb = b[errorModelSort.key];
+        if (col.type === 'string') return errorModelSort.asc ? va.localeCompare(vb) : vb.localeCompare(va);
+        return errorModelSort.asc ? va - vb : vb - va;
+    });
+    modelBody.innerHTML = sorted.map(m => `<tr>
+        <td>${esc(m.model)}</td>
+        <td style="color:var(--accent-red)">${m.errors}</td>
+        <td>${m.error_rate}%</td>
+        <td style="font-size:0.7rem">${m.reasons_str}</td>
+    </tr>`).join('');
+    document.querySelectorAll('#errors-by-model-table th').forEach((th, i) => {
+        const col = ERROR_MODEL_COLS[i];
+        th.classList.toggle('sorted', col.key === errorModelSort.key);
+        th.classList.toggle('asc', col.key === errorModelSort.key && errorModelSort.asc);
+        th.classList.toggle('desc', col.key === errorModelSort.key && !errorModelSort.asc);
+    });
+}
+
 // Update error codes table
 function updateErrorTable(data) {
     const tbody = document.getElementById('errors-body');
     const countEl = document.getElementById('error-count');
     const reasons = data.stop_reasons || {};
-    const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
+    const entries = Object.entries(reasons);
     const total = entries.reduce((s, e) => s + e[1], 0);
 
     if (countEl) countEl.textContent = `(${entries.length})`;
 
     if (!entries.length) {
         tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">no data</td></tr>';
+        lastStopReasonRows = null;
+        lastErrorModelRows = null;
         return;
     }
 
-    const normal = new Set(['endTurn', 'end_turn', 'stop', 'toolUse', 'tool_use']);
-    tbody.innerHTML = entries.map(([reason, count]) => {
-        const pct = (count / total * 100).toFixed(1);
-        const isError = !normal.has(reason);
-        const cls = isError ? 'style="color:var(--accent-red)"' : '';
-        return `<tr>
-            <td ${cls}>${esc(reason)}</td>
-            <td>${count}</td>
-            <td>${pct}%</td>
-            <td>${isError ? 'ERROR' : 'OK'}</td>
-        </tr>`;
-    }).join('');
+    lastStopReasonRows = entries.map(([reason, count]) => ({
+        reason,
+        count,
+        pct: parseFloat((count / total * 100).toFixed(1)),
+        isError: !NORMAL_STOPS.has(reason),
+        status: NORMAL_STOPS.has(reason) ? 'OK' : 'ERROR',
+    }));
+    renderStopReasonRows(lastStopReasonRows);
 
     // Errors by model
-    const modelBody = document.getElementById('errors-by-model-body');
     const models = (data.by_model || []).filter(m => m.errors > 0);
+    const modelBody = document.getElementById('errors-by-model-body');
     if (!models.length) {
         modelBody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">no errors</td></tr>';
+        lastErrorModelRows = null;
         return;
     }
-    modelBody.innerHTML = models.map(m => {
-        const reasons = Object.entries(m.reasons).map(([r, c]) => `${esc(r)}(${c})`).join(', ');
-        return `<tr>
-            <td>${esc(m.model)}</td>
-            <td style="color:var(--accent-red)">${m.errors}</td>
-            <td>${m.error_rate}%</td>
-            <td style="font-size:0.7rem">${reasons}</td>
-        </tr>`;
-    }).join('');
+    lastErrorModelRows = models.map(m => ({
+        model: m.model,
+        errors: m.errors,
+        error_rate: m.error_rate,
+        reasons_str: Object.entries(m.reasons).map(([r, c]) => `${esc(r)}(${c})`).join(', '),
+    }));
+    renderErrorModelRows(lastErrorModelRows);
 }
 
 // Determine chart granularity based on period
@@ -303,6 +369,38 @@ function updateAgentFilter(overview) {
     select.innerHTML = options;
     if (currentAgent) select.value = currentAgent;
 }
+
+// Stop reasons table sort handler
+document.getElementById('stop-reasons-table').querySelector('thead').addEventListener('click', (e) => {
+    const th = e.target.closest('th');
+    if (!th || !lastStopReasonRows) return;
+    const idx = Array.from(th.parentElement.children).indexOf(th);
+    const col = STOP_REASON_COLS[idx];
+    if (!col) return;
+    if (stopReasonSort.key === col.key) {
+        stopReasonSort.asc = !stopReasonSort.asc;
+    } else {
+        stopReasonSort.key = col.key;
+        stopReasonSort.asc = col.type === 'string';
+    }
+    renderStopReasonRows(lastStopReasonRows);
+});
+
+// Errors by model table sort handler
+document.getElementById('errors-by-model-table').querySelector('thead').addEventListener('click', (e) => {
+    const th = e.target.closest('th');
+    if (!th || !lastErrorModelRows) return;
+    const idx = Array.from(th.parentElement.children).indexOf(th);
+    const col = ERROR_MODEL_COLS[idx];
+    if (!col) return;
+    if (errorModelSort.key === col.key) {
+        errorModelSort.asc = !errorModelSort.asc;
+    } else {
+        errorModelSort.key = col.key;
+        errorModelSort.asc = col.type === 'string';
+    }
+    renderErrorModelRows(lastErrorModelRows);
+});
 
 // Session table column sort handler
 document.getElementById('sessions-table').querySelector('thead').addEventListener('click', (e) => {
