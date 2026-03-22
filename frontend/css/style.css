@@ -425,10 +425,28 @@ tr:hover td {
 
 /* Footer */
 footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 1rem 2rem;
     border-top: 1px solid var(--border);
     font-size: 0.85rem;
     color: var(--text-dim);
+}
+
+.footer-links {
+    font-size: 0.75rem;
+}
+
+.footer-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-links a:hover {
+    color: var(--text-primary);
+    text-shadow: var(--glow);
 }
 
 .cursor {

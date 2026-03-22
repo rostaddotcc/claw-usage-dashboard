@@ -20,23 +20,23 @@ const CHART_DEFAULTS = {
         theme: 'dark',
         shared: true,
         intersect: false,
-        style: { fontSize: '11px', fontFamily: "'JetBrains Mono', monospace" },
+        style: { fontSize: '12px', fontFamily: "'JetBrains Mono', monospace" },
         x: { show: true },
     },
     legend: {
-        fontSize: '11px',
+        fontSize: '12px',
         fontFamily: "'JetBrains Mono', monospace",
         labels: { colors: '#00aa2a' },
         markers: { radius: 2 },
     },
     xaxis: {
-        labels: { style: { colors: '#005a15', fontSize: '10px' } },
+        labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
         axisBorder: { color: '#1a3a1a' },
         axisTicks: { color: '#1a3a1a' },
     },
     yaxis: {
         labels: {
-            style: { colors: '#005a15', fontSize: '10px' },
+            style: { colors: '#00aa2a', fontSize: '11px' },
             formatter: val => formatNumber(val),
         },
     },
@@ -126,7 +126,7 @@ const DONUT_DEFAULTS = {
         },
     },
     dataLabels: {
-        style: { fontSize: '10px', fontFamily: "'JetBrains Mono', monospace" },
+        style: { fontSize: '11px', fontFamily: "'JetBrains Mono', monospace" },
     },
     stroke: { width: 1, colors: ['#0a0a0a'] },
 };
@@ -147,21 +147,21 @@ function renderTimeline(data) {
         colors: ['#00ff41', '#00ffff', '#ffaa00'],
         xaxis: {
             categories: dates,
-            labels: { style: { colors: '#005a15', fontSize: '10px' } },
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
         },
         yaxis: [
             {
-                title: { text: 'input / output', style: { color: '#005a15', fontSize: '10px' } },
+                title: { text: 'input / output', style: { color: '#00aa2a', fontSize: '11px' } },
                 labels: {
-                    style: { colors: '#005a15', fontSize: '10px' },
+                    style: { colors: '#00aa2a', fontSize: '11px' },
                     formatter: val => formatNumber(val),
                 },
             },
             {
                 opposite: true,
-                title: { text: 'cache_read', style: { color: '#ffaa00', fontSize: '10px' } },
+                title: { text: 'cache_read', style: { color: '#ffaa00', fontSize: '11px' } },
                 labels: {
-                    style: { colors: '#ffaa00', fontSize: '10px' },
+                    style: { colors: '#ffaa00', fontSize: '11px' },
                     formatter: val => formatNumber(val),
                 },
             },
@@ -189,11 +189,11 @@ function renderCostTimeline(data) {
         colors: ['#ff3333'],
         xaxis: {
             categories: dates,
-            labels: { style: { colors: '#005a15', fontSize: '10px' } },
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
         },
         yaxis: {
             labels: {
-                style: { colors: '#005a15', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 formatter: val => fmtCost(val),
             },
         },
@@ -228,13 +228,13 @@ function renderCostByModel(data) {
         xaxis: {
             categories: models,
             labels: {
-                style: { colors: '#005a15', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 formatter: val => fmtCost(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 maxWidth: 180,
                 formatter: val => val,
             },
@@ -267,13 +267,13 @@ function renderByModel(data) {
         xaxis: {
             categories: models,
             labels: {
-                style: { colors: '#005a15', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 formatter: val => formatNumber(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 maxWidth: 180,
                 formatter: val => val,
             },
@@ -295,13 +295,13 @@ function renderCache(data) {
         colors: ['#00ffff'],
         xaxis: {
             categories: data.over_time.map(d => d.date),
-            labels: { style: { colors: '#005a15', fontSize: '10px' } },
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
         },
         yaxis: {
             min: 0,
             max: 100,
             labels: {
-                style: { colors: '#005a15', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 formatter: val => val.toFixed(0) + '%',
             },
         },
@@ -326,7 +326,7 @@ function renderCache(data) {
                     style: {
                         color: '#00ff41',
                         background: '#0f0f0f',
-                        fontSize: '10px',
+                        fontSize: '11px',
                         fontFamily: "'JetBrains Mono', monospace",
                     },
                 },
@@ -476,13 +476,13 @@ function renderToolCounts(data) {
         xaxis: {
             categories: tools,
             labels: {
-                style: { colors: '#005a15', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 formatter: val => formatNumber(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 maxWidth: 160,
                 formatter: val => val,
             },
@@ -545,11 +545,11 @@ function renderCostForecast(data, period) {
         colors: ['#ff3333', '#ffaa00'],
         xaxis: {
             categories: allDates,
-            labels: { style: { colors: '#005a15', fontSize: '10px' }, rotate: -45, rotateAlways: false },
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' }, rotate: -45, rotateAlways: false },
         },
         yaxis: {
             labels: {
-                style: { colors: '#005a15', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 formatter: val => fmtCost(val),
             },
         },
@@ -571,7 +571,7 @@ function renderCostForecast(data, period) {
                 strokeDashArray: 3,
                 label: {
                     text: 'now',
-                    style: { color: '#00ff41', background: '#0f0f0f', fontSize: '10px', fontFamily: "'JetBrains Mono', monospace" },
+                    style: { color: '#00ff41', background: '#0f0f0f', fontSize: '11px', fontFamily: "'JetBrains Mono', monospace" },
                 },
             }],
         },
@@ -633,11 +633,11 @@ function renderDuration(data) {
         colors: ['#aa55ff', 'rgba(170,85,255,0.4)'],
         xaxis: {
             categories: days,
-            labels: { style: { colors: '#005a15', fontSize: '10px' } },
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
         },
         yaxis: {
             labels: {
-                style: { colors: '#005a15', fontSize: '10px' },
+                style: { colors: '#00aa2a', fontSize: '11px' },
                 formatter: val => fmtMinutes(val),
             },
         },
@@ -675,7 +675,7 @@ function renderToolTimeline(data) {
         colors: COLORS.slice(0, allKeys.length),
         xaxis: {
             categories: dates,
-            labels: { style: { colors: '#005a15', fontSize: '10px' } },
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
         },
         plotOptions: {
             bar: { borderRadius: 2, columnWidth: '60%' },
