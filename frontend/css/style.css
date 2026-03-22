@@ -456,6 +456,40 @@ footer {
     50% { opacity: 0.3; }
 }
 
+/* Export buttons */
+.export-buttons {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px;
+}
+
+.export-buttons button {
+    font-family: inherit;
+    font-size: 0.65rem;
+    padding: 0.3rem 0.5rem;
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+}
+
+.export-buttons button:hover {
+    color: var(--text-primary);
+    background: rgba(0, 255, 65, 0.08);
+    text-shadow: var(--glow);
+}
+
+.export-buttons button:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
 /* Session ID - truncated, clickable */
 .session-id {
     cursor: pointer;

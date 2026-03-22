@@ -6,6 +6,7 @@ let currentAgent = _params.get('agent') || '';
 let allModels = [];
 let allAgents = [];
 let refreshInterval = null;
+let lastData = {};
 
 function updateURL() {
     const p = new URLSearchParams();
@@ -255,6 +256,7 @@ async function refresh() {
             API.tools(params),
         ]);
 
+        lastData = { overview, usage, cache, errors, sessions, tools };
         updateCards(overview);
         updateAgentFilter(overview);
         updateModelFilter(usage);
@@ -392,6 +394,222 @@ document.getElementById('sessions-body').addEventListener('click', (e) => {
     const sid = td.dataset.sid;
     navigator.clipboard.writeText(sid).then(() => showToast('copied: ' + sid));
 });
+
+// --- Export functions ---
+function exportFilename(ext) {
+    const date = new Date().toISOString().slice(0, 10);
+    return `claw-${currentPeriod}-${date}.${ext}`;
+}
+
+function downloadFile(content, filename, type) {
+    const blob = new Blob([content], { type });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function csvVal(v) {
+    const s = String(v ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportFilterLabel() {
+    const parts = [`Period: ${currentPeriod.toUpperCase()}`];
+    parts.push(`Agent: ${currentAgent || 'ALL'}`);
+    parts.push(`Model: ${currentModel || 'ALL'}`);
+    return parts.join(', ');
+}
+
+function exportCSV() {
+    if (!lastData.overview) return;
+    const o = lastData.overview;
+    const lines = [];
+
+    lines.push('# ' + exportFilterLabel());
+    lines.push('');
+    lines.push('Metric,Value');
+    lines.push(`Total Tokens,${o.total_tokens}`);
+    lines.push(`Total Messages,${o.total_messages}`);
+    lines.push(`Total Sessions,${o.total_sessions}`);
+    lines.push(`Cache Hit Rate (%),${o.cache_hit_rate}`);
+    lines.push(`Error Rate (%),${o.error_rate}`);
+    lines.push(`Total Cost ($),${o.total_cost.toFixed(2)}`);
+    lines.push('');
+
+    const sessions = lastData.sessions?.sessions || [];
+    if (sessions.length) {
+        lines.push('Session ID,Agent,Models,Tokens,Messages,Cost,Duration (min),Start Time');
+        for (const s of sessions) {
+            lines.push([
+                csvVal(s.session_id), csvVal(s.agent),
+                csvVal((s.models_used || []).join('; ')),
+                s.total_tokens, s.message_count,
+                s.cost != null ? s.cost.toFixed(2) : '',
+                s.duration_minutes != null ? Math.round(s.duration_minutes) : '',
+                s.start_time || '',
+            ].join(','));
+        }
+        lines.push('');
+    }
+
+    const byModel = lastData.usage?.by_model || [];
+    if (byModel.length) {
+        lines.push('Model,Input,Output,Cache Read,Total,Cost');
+        for (const m of byModel) {
+            lines.push([csvVal(m.model), m.input, m.output, m.cache_read, m.total,
+                m.cost != null ? m.cost.toFixed(2) : ''].join(','));
+        }
+        lines.push('');
+    }
+
+    const byTool = lastData.tools?.by_tool || [];
+    if (byTool.length) {
+        lines.push('Tool,Count');
+        for (const t of byTool) lines.push(`${csvVal(t.tool)},${t.count}`);
+    }
+
+    downloadFile('\uFEFF' + lines.join('\n'), exportFilename('csv'), 'text/csv;charset=utf-8');
+    showToast('exported ' + exportFilename('csv'));
+}
+
+function exportMD() {
+    if (!lastData.overview) return;
+    const o = lastData.overview;
+    const lines = [];
+
+    lines.push('# Claw Usage Dashboard Export');
+    lines.push('');
+    lines.push(`**${exportFilterLabel()}**`);
+    lines.push('');
+    lines.push('## Summary');
+    lines.push('');
+    lines.push('| Metric | Value |');
+    lines.push('|--------|-------|');
+    lines.push(`| Total Tokens | ${fmtTokens(o.total_tokens)} |`);
+    lines.push(`| Total Messages | ${fmtCount(o.total_messages)} |`);
+    lines.push(`| Total Sessions | ${fmtCount(o.total_sessions)} |`);
+    lines.push(`| Cache Hit Rate | ${o.cache_hit_rate}% |`);
+    lines.push(`| Error Rate | ${o.error_rate}% |`);
+    lines.push(`| Total Cost | $${o.total_cost.toFixed(2)} |`);
+    lines.push('');
+
+    const byModel = lastData.usage?.by_model || [];
+    if (byModel.length) {
+        lines.push('## Usage by Model');
+        lines.push('');
+        lines.push('| Model | Input | Output | Cache Read | Total | Cost |');
+        lines.push('|-------|-------|--------|------------|-------|------|');
+        for (const m of byModel) {
+            lines.push(`| ${m.model} | ${fmtTokens(m.input)} | ${fmtTokens(m.output)} | ${fmtTokens(m.cache_read)} | ${fmtTokens(m.total)} | ${m.cost != null ? '$' + m.cost.toFixed(2) : '--'} |`);
+        }
+        lines.push('');
+    }
+
+    const byTool = lastData.tools?.by_tool || [];
+    if (byTool.length) {
+        lines.push('## Tool Usage');
+        lines.push('');
+        lines.push('| Tool | Count |');
+        lines.push('|------|-------|');
+        for (const t of byTool) lines.push(`| ${t.tool} | ${fmtCount(t.count)} |`);
+        lines.push('');
+    }
+
+    const sessions = lastData.sessions?.sessions || [];
+    if (sessions.length) {
+        lines.push('## Sessions');
+        lines.push('');
+        lines.push('| ID | Agent | Model | Tokens | Msgs | Cost | Duration | Time |');
+        lines.push('|----|-------|-------|--------|------|------|----------|------|');
+        for (const s of sessions) {
+            lines.push(`| ${s.session_id.slice(0, 8)}… | ${s.agent} | ${(s.models_used || []).join(', ')} | ${fmtTokens(s.total_tokens)} | ${s.message_count} | ${s.cost != null ? '$' + s.cost.toFixed(2) : '--'} | ${fmtDuration(s.duration_minutes)} | ${fmtDate(s.start_time)} |`);
+        }
+    }
+
+    downloadFile(lines.join('\n'), exportFilename('md'), 'text/markdown;charset=utf-8');
+    showToast('exported ' + exportFilename('md'));
+}
+
+function exportXLSX() {
+    if (!lastData.overview || typeof XLSX === 'undefined') {
+        showToast('XLSX library not loaded');
+        return;
+    }
+    const o = lastData.overview;
+    const wb = XLSX.utils.book_new();
+
+    // Summary sheet
+    const summary = [
+        ['Claw Usage Dashboard Export'],
+        [exportFilterLabel()],
+        [],
+        ['Metric', 'Value'],
+        ['Total Tokens', o.total_tokens],
+        ['Total Messages', o.total_messages],
+        ['Total Sessions', o.total_sessions],
+        ['Cache Hit Rate (%)', o.cache_hit_rate],
+        ['Error Rate (%)', o.error_rate],
+        ['Total Cost ($)', o.total_cost],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
+
+    // Sessions sheet
+    const sessions = lastData.sessions?.sessions || [];
+    if (sessions.length) {
+        const rows = [['Session ID', 'Agent', 'Models', 'Tokens', 'Messages', 'Cost ($)', 'Duration (min)', 'Start Time']];
+        for (const s of sessions) {
+            rows.push([
+                s.session_id, s.agent, (s.models_used || []).join(', '),
+                s.total_tokens, s.message_count, s.cost ?? '',
+                s.duration_minutes != null ? Math.round(s.duration_minutes) : '',
+                s.start_time || '',
+            ]);
+        }
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Sessions');
+    }
+
+    // Usage by Model sheet
+    const byModel = lastData.usage?.by_model || [];
+    if (byModel.length) {
+        const rows = [['Model', 'Input', 'Output', 'Cache Read', 'Total', 'Cost ($)']];
+        for (const m of byModel) rows.push([m.model, m.input, m.output, m.cache_read, m.total, m.cost ?? '']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Model');
+    }
+
+    // By Provider sheet
+    const byProvider = lastData.usage?.by_provider || [];
+    if (byProvider.length) {
+        const rows = [['Provider', 'Total Tokens', 'Cost ($)']];
+        for (const p of byProvider) rows.push([p.provider, p.total, p.cost ?? '']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Provider');
+    }
+
+    // By Agent sheet
+    const byAgent = lastData.usage?.by_agent || [];
+    if (byAgent.length) {
+        const rows = [['Agent', 'Total Tokens', 'Cost ($)']];
+        for (const a of byAgent) rows.push([a.agent, a.total, a.cost ?? '']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Agent');
+    }
+
+    // Tool Usage sheet
+    const byTool = lastData.tools?.by_tool || [];
+    if (byTool.length) {
+        const rows = [['Tool', 'Count']];
+        for (const t of byTool) rows.push([t.tool, t.count]);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Tools');
+    }
+
+    XLSX.writeFile(wb, exportFilename('xlsx'));
+    showToast('exported ' + exportFilename('xlsx'));
+}
+
+// Export button handlers
+document.getElementById('export-csv').addEventListener('click', exportCSV);
+document.getElementById('export-md').addEventListener('click', exportMD);
+document.getElementById('export-xlsx').addEventListener('click', exportXLSX);
 
 // Restore active period button from URL
 document.querySelectorAll('.period-filter button').forEach(b => {
