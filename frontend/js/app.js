@@ -336,6 +336,7 @@ async function refresh() {
         renderByProvider(usage);
         renderByAgent(usage);
         renderToolCounts(tools);
+        renderCostForecast(usage, currentPeriod);
         renderToolTimeline(tools);
         renderDuration(sessions);
         updateTable(sessions);

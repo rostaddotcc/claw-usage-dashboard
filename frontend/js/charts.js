@@ -491,6 +491,93 @@ function renderToolCounts(data) {
     });
 }
 
+// Cost Forecast — shows historical cost + projected trend
+function renderCostForecast(data, period) {
+    if (!data.over_time || data.over_time.length < 2) { clearChart('#chart-cost-forecast'); return; }
+
+    const costs = data.over_time.map(d => Math.round(d.cost * 100) / 100);
+    const dates = data.over_time.map(d => d.date);
+    const n = costs.length;
+
+    // Linear regression: y = slope * x + intercept
+    const sumX = n * (n - 1) / 2;
+    const sumY = costs.reduce((a, b) => a + b, 0);
+    const sumXY = costs.reduce((s, y, i) => s + i * y, 0);
+    const sumX2 = n * (n - 1) * (2 * n - 1) / 6;
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    // How many forecast points to project
+    const forecastSteps = Math.max(3, Math.ceil(n * 0.4));
+
+    // Generate forecast dates (simple label: +1, +2, ...)
+    const lastDate = dates[n - 1];
+    const forecastDates = [];
+    for (let i = 1; i <= forecastSteps; i++) forecastDates.push(lastDate + ' +' + i);
+
+    const allDates = [...dates, ...forecastDates];
+
+    // Historical series (null-padded for forecast range)
+    const historicalData = [...costs, ...Array(forecastSteps).fill(null)];
+
+    // Forecast series (null-padded for historical range, starts at last real value)
+    const forecastData = [...Array(n - 1).fill(null)];
+    for (let i = 0; i <= forecastSteps; i++) {
+        const val = Math.max(0, slope * (n - 1 + i) + intercept);
+        forecastData.push(Math.round(val * 100) / 100);
+    }
+
+    // Projected total for the title
+    const dailyAvg = sumY / n;
+    const periodDays = { hour: 1/24, day: 1, week: 7, month: 30, quarter: 90, half: 180, year: 365, all: n };
+    const nextDays = periodDays[period] || n;
+    const projected = Math.round(dailyAvg * nextDays * 100) / 100;
+
+    const titleEl = document.querySelector('#chart-cost-forecast')?.closest('.chart-box')?.querySelector('.chart-title');
+    if (titleEl) titleEl.textContent = `> Cost Forecast (next period ≈ $${projected.toFixed(2)})`;
+
+    renderChart('#chart-cost-forecast', {
+        chart: { type: 'line', height: 250 },
+        series: [
+            { name: 'actual', data: historicalData },
+            { name: 'forecast', data: forecastData },
+        ],
+        colors: ['#ff3333', '#ffaa00'],
+        xaxis: {
+            categories: allDates,
+            labels: { style: { colors: '#005a15', fontSize: '10px' }, rotate: -45, rotateAlways: false },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#005a15', fontSize: '10px' },
+                formatter: val => fmtCost(val),
+            },
+        },
+        stroke: {
+            width: [2, 2],
+            curve: 'smooth',
+            dashArray: [0, 5],
+        },
+        fill: { type: 'solid' },
+        tooltip: {
+            y: { formatter: val => val != null ? fmtCost(val) : '' },
+        },
+        dataLabels: { enabled: false },
+        legend: { show: true },
+        annotations: {
+            xaxis: [{
+                x: lastDate,
+                borderColor: '#005a15',
+                strokeDashArray: 3,
+                label: {
+                    text: 'now',
+                    style: { color: '#00ff41', background: '#0f0f0f', fontSize: '10px', fontFamily: "'JetBrains Mono', monospace" },
+                },
+            }],
+        },
+    });
+}
+
 function fmtMinutes(val) {
     if (val < 1) return '<1m';
     if (val < 60) return Math.round(val) + 'm';
