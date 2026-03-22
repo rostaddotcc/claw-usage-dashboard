@@ -1,5 +1,6 @@
 let currentPeriod = 'all';
 let currentModel = '';
+let currentAgent = '';
 
 // Format helpers
 function fmtTokens(n) {
@@ -53,9 +54,11 @@ function updateCards(overview) {
     document.getElementById('card-cost').innerHTML = '$' + overview.total_cost.toFixed(2) + trend(overview.total_cost, p?.total_cost, true);
 }
 
-// Session table sorting
+// Session table sorting & pagination
 let sessionSort = { key: 'start_time', asc: false };
 let lastSessionData = null;
+let sessionPage = 0;
+const SESSIONS_PER_PAGE = 25;
 
 const SESSION_COLUMNS = [
     { key: 'session_id', type: 'string' },
@@ -89,7 +92,12 @@ function sortSessions(sessions, key, asc) {
 
 function renderTableRows(sessions) {
     const tbody = document.getElementById('sessions-body');
-    tbody.innerHTML = sessions.map(s => `
+    const totalPages = Math.ceil(sessions.length / SESSIONS_PER_PAGE);
+    if (sessionPage >= totalPages) sessionPage = Math.max(0, totalPages - 1);
+    const start = sessionPage * SESSIONS_PER_PAGE;
+    const page = sessions.slice(start, start + SESSIONS_PER_PAGE);
+
+    tbody.innerHTML = page.map(s => `
         <tr>
             <td>${s.session_id}</td>
             <td>${s.agent}</td>
@@ -109,6 +117,20 @@ function renderTableRows(sessions) {
         th.classList.toggle('asc', col.key === sessionSort.key && sessionSort.asc);
         th.classList.toggle('desc', col.key === sessionSort.key && !sessionSort.asc);
     });
+
+    // Update pagination controls
+    const pag = document.getElementById('session-pagination');
+    if (pag) {
+        if (totalPages <= 1) {
+            pag.style.display = 'none';
+        } else {
+            pag.style.display = 'flex';
+            pag.querySelector('.page-info').textContent =
+                `${start + 1}–${Math.min(start + SESSIONS_PER_PAGE, sessions.length)} of ${sessions.length}`;
+            pag.querySelector('.page-prev').disabled = sessionPage === 0;
+            pag.querySelector('.page-next').disabled = sessionPage >= totalPages - 1;
+        }
+    }
 }
 
 // Update sessions table
@@ -117,12 +139,15 @@ function updateTable(data) {
     if (!data.sessions || !data.sessions.length) {
         tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">no sessions found</td></tr>';
         lastSessionData = null;
+        const pag = document.getElementById('session-pagination');
+        if (pag) pag.style.display = 'none';
         return;
     }
 
     const countEl = document.getElementById('session-count');
     if (countEl) countEl.textContent = `(${data.sessions.length})`;
 
+    sessionPage = 0;
     lastSessionData = data.sessions;
     renderTableRows(sortSessions(data.sessions, sessionSort.key, sessionSort.asc));
 }
@@ -190,6 +215,7 @@ async function refresh() {
     document.body.classList.add('loading');
     const params = { period: currentPeriod, granularity: getGranularity(currentPeriod) };
     if (currentModel) params.model = currentModel;
+    if (currentAgent) params.agent = currentAgent;
 
     try {
         const [overview, usage, cache, errors, sessions, tools] = await Promise.all([
@@ -202,6 +228,7 @@ async function refresh() {
         ]);
 
         updateCards(overview);
+        updateAgentFilter(overview);
         updateModelFilter(usage);
         renderTimeline(usage);
         renderCostTimeline(usage);
@@ -233,6 +260,16 @@ function updateModelFilter(usage) {
     select.innerHTML = options;
 }
 
+// Update agent filter dropdown
+function updateAgentFilter(overview) {
+    if (currentAgent) return;
+    const select = document.getElementById('agent-filter');
+    const agents = overview.agents || [];
+    const options = '<option value="">ALL AGENTS</option>' +
+        agents.map(a => `<option value="${a}">${a}</option>`).join('');
+    select.innerHTML = options;
+}
+
 // Session table column sort handler
 document.getElementById('sessions-table').querySelector('thead').addEventListener('click', (e) => {
     const th = e.target.closest('th');
@@ -246,6 +283,7 @@ document.getElementById('sessions-table').querySelector('thead').addEventListene
         sessionSort.key = col.key;
         sessionSort.asc = col.type === 'string';
     }
+    sessionPage = 0;
     renderTableRows(sortSessions(lastSessionData, sessionSort.key, sessionSort.asc));
 });
 
@@ -253,6 +291,24 @@ document.getElementById('sessions-table').querySelector('thead').addEventListene
 document.getElementById('model-filter').addEventListener('change', (e) => {
     currentModel = e.target.value;
     refresh();
+});
+
+// Agent filter change handler
+document.getElementById('agent-filter').addEventListener('change', (e) => {
+    currentAgent = e.target.value;
+    refresh();
+});
+
+// Session pagination handlers
+document.getElementById('session-pagination').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn || !lastSessionData) return;
+    if (btn.classList.contains('page-prev') && sessionPage > 0) {
+        sessionPage--;
+    } else if (btn.classList.contains('page-next')) {
+        sessionPage++;
+    }
+    renderTableRows(sortSessions(lastSessionData, sessionSort.key, sessionSort.asc));
 });
 
 // Provider tokens/cost toggle
