@@ -12,15 +12,17 @@ Retro terminal-styled web dashboard for monitoring [OpenClaw](https://github.com
 ## Features
 
 - **Token usage tracking** — input, output, and cache tokens over time, by model, provider, and agent
+- **Cost breakdown** — per-session and aggregate cost tracking with cost-over-time charts
+- **Cost forecast** — linear regression-based cost projection for the next period
 - **Tool usage tracking** — tracks tool calls (exec, web_search, read, web_fetch, edit, write, etc.) with counts and time-series charts
 - **Cache hit rate monitoring** — overall and per-model cache performance with trend charts
-- **Error analysis** — stop reason distribution and error rate over time
-- **Cost breakdown** — per-session and aggregate cost tracking
-- **Session browser** — collapsible table view of all sessions with model, tokens, cost, duration, and timestamps
-- **Session duration** — per-session duration chart showing wall-clock time
-- **Time filtering** — 1H / 1D / 7D / 30D / 3M / 6M / 12M / ALL period selection with auto-granularity
-- **Model filtering** — dropdown to filter all data by a specific model
-- **Zero dependencies frontend** — vanilla JS with ApexCharts via CDN, no build step
+- **Error analysis** — sortable stop reason distribution and error-by-model tables, error rate over time
+- **Session browser** — collapsible, sortable table with model, tokens, cost, duration, and timestamps; click-to-copy session IDs
+- **Session duration** — per-session duration chart with daily averages and scatter points
+- **Filtering** — period (1H/1D/7D/30D/3M/6M/12M/ALL), model, and agent dropdowns; filters persist in URL params
+- **Auto-refresh** — configurable interval (30s / 60s / 5m) for live monitoring
+- **Data export** — download current view as CSV, Markdown, or Excel (.xlsx)
+- **Zero dependencies frontend** — vanilla JS with ApexCharts and SheetJS via CDN, no build step
 
 ## Quick Start
 

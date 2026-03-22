@@ -137,9 +137,17 @@ Three export formats are available via header buttons. All exports include the a
 
 Export filenames follow the pattern `claw-{period}-{date}.{ext}`.
 
+### Cost forecast
+
+The Cost Forecast chart (`renderCostForecast` in `charts.js`) uses linear regression on the `cost` field from `usage.over_time` data. It shows historical cost as a solid red line and projects a dashed amber forecast line forward (~40% of the period length). The chart title dynamically updates with the projected cost for the next equivalent period based on daily average extrapolation. Requires at least 2 data points to render.
+
+### Sortable tables
+
+All three collapsible tables (Stop Reasons, Errors by Model, Sessions) support column sorting with the same pattern: a `*_COLS` array defines column keys and types, a `*Sort` state object tracks current key and direction, and a `render*Rows()` function sorts and re-renders. Click a header to sort descending; click again to toggle ascending. Sort indicators (▲/▼) use the same CSS classes (`sorted`, `asc`, `desc`) as the sessions table.
+
 ### Error classification
 
-Stop reasons in `NORMAL_STOP_REASONS` (`backend/aggregators/errors.py`) are considered non-errors: `endTurn`, `end_turn`, `stop`, `toolUse`, `tool_use`. Anything else counts as an error.
+Stop reasons in `NORMAL_STOPS` (frontend) and `NORMAL_STOP_REASONS` (`backend/aggregators/errors.py`) are considered non-errors: `endTurn`, `end_turn`, `stop`, `toolUse`, `tool_use`. Anything else counts as an error.
 
 ## Deployment
 
