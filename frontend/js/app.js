@@ -2,6 +2,13 @@ let currentPeriod = 'all';
 let currentModel = '';
 let currentAgent = '';
 
+// Escape HTML special characters to prevent XSS
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
 // Format helpers
 function fmtTokens(n) {
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -99,9 +106,9 @@ function renderTableRows(sessions) {
 
     tbody.innerHTML = page.map(s => `
         <tr>
-            <td>${s.session_id}</td>
-            <td>${s.agent}</td>
-            <td>${s.models_used.join(', ')}</td>
+            <td>${esc(s.session_id)}</td>
+            <td>${esc(s.agent)}</td>
+            <td>${esc(s.models_used.join(', '))}</td>
             <td>${fmtTokens(s.total_tokens)}</td>
             <td>${s.message_count}</td>
             <td>$${s.cost.toFixed(2)}</td>
@@ -173,7 +180,7 @@ function updateErrorTable(data) {
         const isError = !normal.has(reason);
         const cls = isError ? 'style="color:var(--accent-red)"' : '';
         return `<tr>
-            <td ${cls}>${reason}</td>
+            <td ${cls}>${esc(reason)}</td>
             <td>${count}</td>
             <td>${pct}%</td>
             <td>${isError ? 'ERROR' : 'OK'}</td>
@@ -188,9 +195,9 @@ function updateErrorTable(data) {
         return;
     }
     modelBody.innerHTML = models.map(m => {
-        const reasons = Object.entries(m.reasons).map(([r, c]) => `${r}(${c})`).join(', ');
+        const reasons = Object.entries(m.reasons).map(([r, c]) => `${esc(r)}(${c})`).join(', ');
         return `<tr>
-            <td>${m.model}</td>
+            <td>${esc(m.model)}</td>
             <td style="color:var(--accent-red)">${m.errors}</td>
             <td>${m.error_rate}%</td>
             <td style="font-size:0.7rem">${reasons}</td>
@@ -256,7 +263,7 @@ function updateModelFilter(usage) {
     const select = document.getElementById('model-filter');
     const models = (usage.by_model || []).map(d => d.model).sort();
     const options = '<option value="">ALL MODELS</option>' +
-        models.map(m => `<option value="${m}">${m}</option>`).join('');
+        models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
     select.innerHTML = options;
 }
 
@@ -266,7 +273,7 @@ function updateAgentFilter(overview) {
     const select = document.getElementById('agent-filter');
     const agents = overview.agents || [];
     const options = '<option value="">ALL AGENTS</option>' +
-        agents.map(a => `<option value="${a}">${a}</option>`).join('');
+        agents.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
     select.innerHTML = options;
 }
 
