@@ -137,21 +137,24 @@ function renderTimeline(data) {
 
     const dates = data.over_time.map(d => d.date);
 
+    const totalData = data.over_time.map(d => (d.input || 0) + (d.output || 0) + (d.cache_read || 0));
+
     renderChart('#chart-timeline', {
         chart: { type: 'line', height: 280 },
         series: [
+            { name: 'total', type: 'bar', data: totalData },
             { name: 'input', type: 'bar', data: data.over_time.map(d => d.input) },
             { name: 'output', type: 'bar', data: data.over_time.map(d => d.output) },
             { name: 'cache_read', type: 'line', data: data.over_time.map(d => d.cache_read) },
         ],
-        colors: ['#00ff41', '#00ffff', '#ffaa00'],
+        colors: ['rgba(255,255,255,0.08)', '#00ff41', '#00ffff', '#ffaa00'],
         xaxis: {
             categories: dates,
             labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
         },
         yaxis: [
             {
-                title: { text: 'input / output', style: { color: '#00aa2a', fontSize: '11px' } },
+                title: { text: 'tokens', style: { color: '#00aa2a', fontSize: '11px' } },
                 labels: {
                     style: { colors: '#00aa2a', fontSize: '11px' },
                     formatter: val => formatNumber(val),
@@ -167,9 +170,9 @@ function renderTimeline(data) {
             },
         ],
         plotOptions: {
-            bar: { borderRadius: 2, columnWidth: '60%' },
+            bar: { borderRadius: 2, columnWidth: '70%' },
         },
-        stroke: { width: [0, 0, 2], curve: 'smooth' },
+        stroke: { width: [0, 0, 0, 2], curve: 'smooth' },
         tooltip: {
             y: { formatter: val => val.toLocaleString('sv-SE') + ' tokens' },
         },
