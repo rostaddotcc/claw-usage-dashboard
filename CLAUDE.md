@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Claw Usage Dashboard
 
-Claw Usage Dashboard is a retro terminal-styled web dashboard for monitoring OpenClaw (AI gateway) usage. It reads session JSONL logs and presents token usage, cache rates, error rates, cost breakdowns, and tool usage via interactive charts.
+Claw Usage Dashboard is a retro terminal-styled web dashboard for monitoring OpenClaw (AI gateway) usage. It reads session JSONL logs and presents token usage, cache rates, error rates, cost breakdowns, and tool usage via interactive charts. It also monitors server health (CPU, RAM, disk, network), gateway uptime, and cron job status.
 
 ## Commands
 
@@ -25,7 +25,7 @@ docker compose up -d --build
 # The container mounts /home/rostads/.openclaw as /data (read-only)
 ```
 
-Requires Python 3.13. Dependencies are minimal: just `fastapi` and `uvicorn` (see `requirements.txt`).
+Requires Python 3.13. Dependencies: `fastapi`, `uvicorn`, `psutil` (see `requirements.txt`).
 
 There are no tests, linters, or build steps configured.
 
@@ -47,15 +47,15 @@ JSONL files (/data/agents/*/sessions/*.jsonl*, /data/cron/runs/*.jsonl*)
 
 FastAPI serves both the JSON API (`/api/*`) and the static frontend (`/`) from a single process. A middleware sets `no-cache` headers on `/js/` and `/css/` files to prevent stale browser caches after deploys.
 
-### Collector pattern
+### Collectors
 
-`backend/collectors/base.py` defines an abstract `BaseCollector` with `collect(**filters)` and `source_name()`. Currently only `SessionCollector` exists. To add a new data source: subclass `BaseCollector`, create matching aggregator functions, and wire up a new router.
+`backend/collectors/base.py` defines an abstract `BaseCollector` with `collect(**filters)` and `source_name()`. Three collectors exist:
 
-`SessionCollector` is instantiated as a module-level singleton (`backend/collectors/sessions.py:collector`) imported directly by routers. It maintains an in-memory cache with a 30-second TTL (`CACHE_TTL_SECONDS` in `backend/config.py`).
+- **`SessionCollector`** (`sessions.py`) — Parses JSONL session files. Module-level singleton (`collector`). In-memory cache with 30-second TTL (`CACHE_TTL_SECONDS`). Only parses entries with `type: "message"` containing a `usage` object. Cron runs use `_parse_cron_line()` with a different format (snake_case fields, top-level usage). Cron records get `agent: "cron"`.
 
-Only JSONL entries with `type: "message"` that contain a `usage` object are parsed — all other entry types (system, tool results, etc.) are silently skipped. Tool calls are extracted from the `content` array of these entries (blocks with `type: "toolCall"` or `type: "tool_use"`).
+- **`SystemCollector`** (`system.py`) — Reads CPU, RAM, disk, network via `psutil`. Module-level singleton (`system_collector`). 10-second cache TTL (`SYSTEM_CACHE_TTL_SECONDS`). Maintains an in-memory deque of snapshots (max 1440 entries, ~24h at 1/min). History resets on process restart.
 
-Cron runs (`/data/cron/runs/*.jsonl*`) are parsed separately via `_parse_cron_line()`. Cron entries use a different format: usage may be at the top level (not nested in `message`), and field names use snake_case (`input_tokens`, `output_tokens`) instead of camelCase. Cron records are assigned `agent: "cron"`.
+- **`UptimeCollector`** (`uptime.py`) — Performs periodic HTTP health checks against `UPTIME_TARGET_URL`. Module-level singleton (`uptime_collector`). Runs as an asyncio background task started via the FastAPI `lifespan` handler in `main.py`. Stores check results in an in-memory deque (max 1440). Uses stdlib `urllib.request` (no extra dependencies).
 
 ### OpenClaw JSONL format
 
@@ -95,11 +95,24 @@ Key format details:
 
 ### Aggregators
 
-Pure functions in `backend/aggregators/` that take a list of normalized records and return grouped/computed results. Four modules: `usage.py` (by model/provider/agent/time), `cache.py` (hit rates), `errors.py` (stop reason analysis), `tools.py` (tool call counts and trends). The shared `_time_key()` helper in `usage.py` is also imported by `cache.py`, `errors.py`, and `tools.py` for consistent time bucketing.
+Pure functions in `backend/aggregators/` that take a list of normalized records and return grouped/computed results. Six modules:
+- `usage.py` (by model/provider/agent/time) — contains shared `_time_key()` helper imported by other aggregators
+- `cache.py` (hit rates)
+- `errors.py` (stop reason analysis) — defines `NORMAL_STOP_REASONS`
+- `tools.py` (tool call counts and trends)
+- `system.py` (CPU/RAM overview, time series, network deltas)
+- `uptime.py` (uptime summary, response time series, status code distribution)
+- `cron.py` (groups cron records by session_id into per-job summaries, computes success rate)
 
 ### Routers
 
-All routers share a common pattern: they import the singleton `collector`, call `_period_to_dates()` from `backend/routers/overview.py` to convert period strings into date filters, then delegate to aggregator functions. Six endpoints: `/api/overview`, `/api/usage`, `/api/cache`, `/api/errors`, `/api/sessions`, `/api/tools`.
+Session-based routers share a common pattern: import the singleton `collector`, call `_period_to_dates()` from `backend/routers/overview.py` to convert period strings into date filters, then delegate to aggregator functions.
+
+Nine endpoints:
+- `/api/overview`, `/api/usage`, `/api/cache`, `/api/errors`, `/api/sessions`, `/api/tools` — session-based, accept period/agent/model/provider filters
+- `/api/system` — real-time server metrics (no filters, returns current + history)
+- `/api/uptime` — gateway health check results (no filters)
+- `/api/cron` — cron job summaries (accepts period filter, forces `agent="cron"`)
 
 Debug endpoints exist at `/api/tools/debug` and `/api/tools/raw` for diagnosing tool parsing issues.
 
@@ -111,15 +124,27 @@ The `/api/sessions` endpoint aggregates records per session and computes `durati
 
 ### API query parameters
 
-All `/api/*` endpoints accept: `period` (hour/day/week/month/quarter/half/year/all), `agent`, `model`, `provider`. Endpoints with time-series data also accept `granularity` (minute/hour/day/week/month). The frontend auto-selects granularity based on period (e.g. hour→minute, day→hour, week/month→day, quarter/half→week, year→month, all→week).
+Session-based `/api/*` endpoints accept: `period` (hour/day/week/month/quarter/half/year/all), `agent`, `model`, `provider`. Endpoints with time-series data also accept `granularity` (minute/hour/day/week/month). The frontend auto-selects granularity based on period (e.g. hour→minute, day→hour, week/month→day, quarter/half→week, year→month, all→week).
 
 ### Frontend
 
-Single-page HTML with no build step (`lang="sv"`). Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Date/time formatting uses `sv-SE` locale. Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, and chart rendering).
+Single-page HTML with no build step (`lang="sv"`). Uses ApexCharts via CDN. Terminal/retro theme (green-on-black, JetBrains Mono, scanlines). Date/time formatting uses `sv-SE` locale. Three JS files loaded in order: `api.js` (fetch wrapper), `charts.js` (ApexCharts configs and render functions), `app.js` (orchestrates data fetching, card updates, tab switching, and chart rendering).
 
-The header is centered with controls stacked below the title. It contains: agent filter, model filter, period buttons (1H/1D/7D/30D/3M/6M/12M/ALL), auto-refresh dropdown (OFF/30s/60s/5m), and export buttons (.csv/.md/.xlsx). All filters trigger a full data refresh and persist to URL query params via `history.replaceState` — filters survive page refreshes and are shareable.
+#### Tab system
+
+The dashboard uses a tab bar below the summary cards with four tabs: **USAGE** (default), **INFRA**, **UPTIME**, **CRON**. Tab state persists in the `tab` URL query parameter. Charts are only rendered when their tab is active (ApexCharts needs visible containers). When switching to a tab, `refreshTab(tab)` fetches tab-specific data and renders charts. The USAGE tab's charts are lazily rendered if the user navigated directly to another tab.
+
+#### Summary cards
+
+Nine global summary cards are always visible regardless of active tab: TOKENS, MESSAGES, SESSIONS, CACHE HIT, ERRORS, COST, UPTIME, CPU, DISK. The last three use color-coded thresholds (green/yellow/red) via `thresholdClass()`.
+
+#### Header controls
+
+Agent filter, model filter, period buttons (1H/1D/7D/30D/3M/6M/12M/ALL), auto-refresh dropdown (OFF/30s/60s/5m), date range inputs, and export buttons (.csv/.md/.xlsx). All filters trigger a full data refresh and persist to URL query params via `history.replaceState` — filters survive page refreshes and are shareable.
 
 The model and agent filter dropdowns cache the full option list in `allModels`/`allAgents` so that filtering by one model doesn't shrink the dropdown to only that model's data.
+
+#### Chart rendering
 
 All charts go through `renderChart(id, options)` which destroys the previous instance (tracked in `chartInstances`) and deep-merges `CHART_DEFAULTS` (terminal theme colors, fonts) with the per-chart options. To add a new chart: call `renderChart('#my-chart', { ... })` — the theme is applied automatically. When data is empty, `clearChart(id)` destroys the chart and shows a "no data" message.
 
@@ -143,11 +168,19 @@ The Cost Forecast chart (`renderCostForecast` in `charts.js`) uses linear regres
 
 ### Sortable tables
 
-All three collapsible tables (Stop Reasons, Errors by Model, Sessions) support column sorting with the same pattern: a `*_COLS` array defines column keys and types, a `*Sort` state object tracks current key and direction, and a `render*Rows()` function sorts and re-renders. Click a header to sort descending; click again to toggle ascending. Sort indicators (▲/▼) use the same CSS classes (`sorted`, `asc`, `desc`) as the sessions table.
+Four sortable tables exist (Stop Reasons, Errors by Model, Sessions, Cron Jobs). All follow the same pattern: a `*_COLS` array defines column keys and types, a `*Sort` state object tracks current key and direction, and a `render*Rows()` function sorts and re-renders. Click a header to sort descending; click again to toggle ascending. Sort indicators (▲/▼) use CSS classes (`sorted`, `asc`, `desc`).
 
 ### Error classification
 
-Stop reasons in `NORMAL_STOPS` (frontend) and `NORMAL_STOP_REASONS` (`backend/aggregators/errors.py`) are considered non-errors: `endTurn`, `end_turn`, `stop`, `toolUse`, `tool_use`. Anything else counts as an error.
+Stop reasons in `NORMAL_STOPS` (frontend) and `NORMAL_STOP_REASONS` (`backend/aggregators/errors.py`) are considered non-errors: `endTurn`, `end_turn`, `stop`, `toolUse`, `tool_use`. Anything else counts as an error. The cron aggregator also uses `NORMAL_STOP_REASONS` to determine job success/failure.
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATA_DIR` | `/data` | Path to the OpenClaw data directory |
+| `UPTIME_TARGET_URL` | `http://localhost:8090/api/overview` | URL to health-check for uptime monitoring |
+| `UPTIME_CHECK_INTERVAL` | `60` | Seconds between uptime checks |
 
 ## Deployment
 

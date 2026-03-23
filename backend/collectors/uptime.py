@@ -1,3 +1,4 @@
+import asyncio
 import time
 import urllib.request
 import urllib.error
@@ -32,7 +33,8 @@ class UptimeCollector(BaseCollector):
             "status_codes": dict(Counter(c["status_code"] for c in checks)),
         }
 
-    async def perform_check(self):
+    def _do_check(self) -> dict[str, Any]:
+        """Synchronous HTTP check — must run in an executor to avoid blocking."""
         ts = datetime.now(timezone.utc).isoformat()
         start = time.monotonic()
         try:
@@ -40,20 +42,25 @@ class UptimeCollector(BaseCollector):
             with urllib.request.urlopen(req, timeout=10) as resp:
                 status = resp.status
                 elapsed = round((time.monotonic() - start) * 1000)
-                self._checks.append({
+                return {
                     "timestamp": ts,
                     "status_code": status,
                     "response_time_ms": elapsed,
                     "is_up": 200 <= status < 400,
-                })
+                }
         except Exception:
             elapsed = round((time.monotonic() - start) * 1000)
-            self._checks.append({
+            return {
                 "timestamp": ts,
                 "status_code": 0,
                 "response_time_ms": elapsed,
                 "is_up": False,
-            })
+            }
+
+    async def perform_check(self):
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, self._do_check)
+        self._checks.append(result)
 
 
 uptime_collector = UptimeCollector()
