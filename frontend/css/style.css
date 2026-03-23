@@ -187,11 +187,12 @@ main {
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 1rem 1.2rem;
-    transition: border-color 0.3s;
+    transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .card:hover {
     border-color: var(--border-bright);
+    box-shadow: var(--glow);
 }
 
 .card-label {
@@ -237,6 +238,12 @@ main {
     border-radius: 6px;
     padding: 1rem 1.2rem;
     min-height: 280px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.chart-box:hover {
+    border-color: var(--border-bright);
+    box-shadow: var(--glow);
 }
 
 .chart-box.wide {
@@ -290,6 +297,12 @@ main {
     border-radius: 6px;
     padding: 1rem 1.2rem;
     margin-bottom: 1.5rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.table-section:hover {
+    border-color: var(--border-bright);
+    box-shadow: var(--glow);
 }
 
 .collapsible .collapsible-toggle {
