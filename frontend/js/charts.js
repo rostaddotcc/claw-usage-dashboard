@@ -108,20 +108,13 @@ function groupTopN(items, n, labelKey, valueKey) {
 }
 
 // Donut helper — used by provider and agent charts
+// Center labels are disabled — totals are shown in chart titles instead
 const DONUT_DEFAULTS = {
     plotOptions: {
         pie: {
             donut: {
                 size: '55%',
-                labels: {
-                    show: true,
-                    total: {
-                        show: true,
-                        color: '#00aa2a',
-                        fontSize: '12px',
-                        fontFamily: "'JetBrains Mono', monospace",
-                    },
-                },
+                labels: { show: false },
             },
         },
     },
@@ -344,6 +337,7 @@ function renderErrors(data) {
 
     const labels = Object.keys(data.stop_reasons);
     const values = Object.values(data.stop_reasons);
+    const total = values.reduce((a, b) => a + b, 0);
 
     const colorMap = {
         endTurn: '#00ff41', end_turn: '#00ff41', stop: '#00ff41',
@@ -352,26 +346,15 @@ function renderErrors(data) {
     };
     const colors = labels.map(l => colorMap[l] || '#ff3333');
 
+    const titleEl = document.querySelector('#chart-errors')?.closest('.chart-box')?.querySelector('.chart-title');
+    if (titleEl) titleEl.textContent = `> Stop Reasons (${formatNumber(total)} total)`;
+
     renderChart('#chart-errors', {
         chart: { type: 'donut', height: 250 },
         series: values,
         labels: labels,
         colors: colors,
         ...DONUT_DEFAULTS,
-        plotOptions: {
-            pie: {
-                donut: {
-                    ...DONUT_DEFAULTS.plotOptions.pie.donut,
-                    labels: {
-                        ...DONUT_DEFAULTS.plotOptions.pie.donut.labels,
-                        total: {
-                            ...DONUT_DEFAULTS.plotOptions.pie.donut.labels.total,
-                            label: 'total',
-                        },
-                    },
-                },
-            },
-        },
     });
 }
 
@@ -386,7 +369,17 @@ function renderByProvider(data) {
     const useCost = providerMode === 'cost';
     const values = data.by_provider.map(d => useCost ? Math.round(d.cost * 100) / 100 : d.total);
     const labels = data.by_provider.map(d => d.provider);
-    const centerLabel = useCost ? 'cost' : 'tokens';
+    const total = values.reduce((a, b) => a + b, 0);
+    const totalStr = useCost ? fmtCost(total) : formatNumber(total) + ' tokens';
+
+    const titleEl = document.querySelector('#chart-by-provider')?.closest('.chart-box')?.querySelector('.chart-title');
+    if (titleEl) {
+        // Update only the text node before the toggle span to preserve event listeners
+        const firstText = titleEl.firstChild;
+        if (firstText && firstText.nodeType === Node.TEXT_NODE) {
+            firstText.textContent = `> By Provider (${totalStr}) `;
+        }
+    }
 
     renderChart('#chart-by-provider', {
         chart: { type: 'donut', height: 250 },
@@ -394,23 +387,6 @@ function renderByProvider(data) {
         labels: labels,
         colors: COLORS.slice(0, labels.length),
         ...DONUT_DEFAULTS,
-        plotOptions: {
-            pie: {
-                donut: {
-                    ...DONUT_DEFAULTS.plotOptions.pie.donut,
-                    labels: {
-                        ...DONUT_DEFAULTS.plotOptions.pie.donut.labels,
-                        total: {
-                            ...DONUT_DEFAULTS.plotOptions.pie.donut.labels.total,
-                            label: centerLabel,
-                            formatter: () => useCost
-                                ? fmtCost(values.reduce((a, b) => a + b, 0))
-                                : formatNumber(values.reduce((a, b) => a + b, 0)),
-                        },
-                    },
-                },
-            },
-        },
         tooltip: {
             y: {
                 formatter: val => useCost ? fmtCost(val) : val.toLocaleString('sv-SE') + ' tokens',
@@ -429,7 +405,16 @@ function renderByAgent(data) {
     const useCost = agentMode === 'cost';
     const values = data.by_agent.map(d => useCost ? Math.round(d.cost * 100) / 100 : d.total);
     const labels = data.by_agent.map(d => d.agent);
-    const centerLabel = useCost ? 'cost' : 'tokens';
+    const total = values.reduce((a, b) => a + b, 0);
+    const totalStr = useCost ? fmtCost(total) : formatNumber(total) + ' tokens';
+
+    const titleEl = document.querySelector('#chart-by-agent')?.closest('.chart-box')?.querySelector('.chart-title');
+    if (titleEl) {
+        const firstText = titleEl.firstChild;
+        if (firstText && firstText.nodeType === Node.TEXT_NODE) {
+            firstText.textContent = `> By Agent (${totalStr}) `;
+        }
+    }
 
     renderChart('#chart-by-agent', {
         chart: { type: 'donut', height: 250 },
@@ -437,23 +422,6 @@ function renderByAgent(data) {
         labels: labels,
         colors: COLORS.slice(0, labels.length),
         ...DONUT_DEFAULTS,
-        plotOptions: {
-            pie: {
-                donut: {
-                    ...DONUT_DEFAULTS.plotOptions.pie.donut,
-                    labels: {
-                        ...DONUT_DEFAULTS.plotOptions.pie.donut.labels,
-                        total: {
-                            ...DONUT_DEFAULTS.plotOptions.pie.donut.labels.total,
-                            label: centerLabel,
-                            formatter: () => useCost
-                                ? fmtCost(values.reduce((a, b) => a + b, 0))
-                                : formatNumber(values.reduce((a, b) => a + b, 0)),
-                        },
-                    },
-                },
-            },
-        },
         tooltip: {
             y: {
                 formatter: val => useCost ? fmtCost(val) : val.toLocaleString('sv-SE') + ' tokens',
@@ -796,6 +764,7 @@ function renderStatusCodes(data) {
 
     const labels = entries.map(([k]) => k === '0' ? 'timeout' : k);
     const values = entries.map(([, v]) => v);
+    const total = values.reduce((a, b) => a + b, 0);
 
     const colorMap = {
         '200': '#00ff41', '201': '#00ff41', '204': '#00ff41',
@@ -805,6 +774,9 @@ function renderStatusCodes(data) {
         '0': '#ff3333',
     };
     const colors = entries.map(([k]) => colorMap[k] || '#aa55ff');
+
+    const titleEl = document.querySelector('#chart-status-codes')?.closest('.chart-box')?.querySelector('.chart-title');
+    if (titleEl) titleEl.textContent = `> Status Code Distribution (${total} checks)`;
 
     renderChart('#chart-status-codes', {
         chart: { type: 'donut', height: 250 },

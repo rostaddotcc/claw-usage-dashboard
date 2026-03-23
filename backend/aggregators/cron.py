@@ -1,64 +1,77 @@
-from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Any
 
-from backend.aggregators.errors import NORMAL_STOP_REASONS
 
+def aggregate_cron_jobs(data: dict[str, Any]) -> dict[str, Any]:
+    """Combine job definitions with their run history."""
+    jobs_def = data.get("jobs", {})
+    runs = data.get("runs", {})
 
-def aggregate_cron_jobs(records: list[dict[str, Any]]) -> dict[str, Any]:
-    cron_records = [r for r in records if r["agent"] == "cron"]
-
-    jobs: dict[str, dict] = defaultdict(lambda: {
-        "messages": 0,
-        "total_tokens": 0,
-        "cost": 0.0,
-        "start_time": None,
-        "end_time": None,
-        "last_stop_reason": "unknown",
-        "models_used": set(),
-    })
-
-    for r in cron_records:
-        j = jobs[r["session_id"]]
-        j["messages"] += 1
-        j["total_tokens"] += r["total_tokens"]
-        j["cost"] += r["cost_total"]
-        j["last_stop_reason"] = r["stop_reason"]
-        j["models_used"].add(r["model"])
-
-        ts = r["timestamp"]
-        if j["start_time"] is None or ts < j["start_time"]:
-            j["start_time"] = ts
-        if j["end_time"] is None or ts > j["end_time"]:
-            j["end_time"] = ts
+    # Collect all job IDs from both definitions and runs
+    all_job_ids = set(jobs_def.keys()) | set(runs.keys())
 
     result = []
-    for sid, j in jobs.items():
-        duration_min = None
-        if j["start_time"] and j["end_time"]:
-            duration_min = round((j["end_time"] - j["start_time"]).total_seconds() / 60, 1)
+    for job_id in sorted(all_job_ids):
+        job_info = jobs_def.get(job_id, {})
+        job_runs = runs.get(job_id, [])
 
-        success = j["last_stop_reason"] in NORMAL_STOP_REASONS
+        # Get the latest "finished" run
+        finished_runs = [r for r in job_runs if r.get("action") == "finished"]
+        # If no "finished" runs, use all runs
+        if not finished_runs:
+            finished_runs = job_runs
+
+        last_run = None
+        last_status = "unknown"
+        last_duration_ms = 0
+        last_error = None
+        next_run = None
+        total_runs = len(finished_runs)
+        successful_runs = sum(1 for r in finished_runs if r.get("status") == "ok")
+
+        if finished_runs:
+            # Sort by timestamp descending
+            finished_runs.sort(key=lambda r: r.get("timestamp_ms", 0), reverse=True)
+            latest = finished_runs[0]
+            ts_ms = latest.get("timestamp_ms", 0)
+            if ts_ms:
+                last_run = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
+            last_status = latest.get("status", "unknown")
+            last_duration_ms = latest.get("duration_ms", 0)
+            last_error = latest.get("error")
+            next_ms = latest.get("next_run_ms", 0)
+            if next_ms:
+                next_run = datetime.fromtimestamp(next_ms / 1000, tz=timezone.utc).isoformat()
+
         result.append({
-            "session_id": sid[:8],
-            "session_id_full": sid,
-            "status": "OK" if success else "FAILED",
-            "last_run": j["start_time"].isoformat() if j["start_time"] else None,
-            "duration_minutes": duration_min,
-            "messages": j["messages"],
-            "total_tokens": j["total_tokens"],
-            "cost": round(j["cost"], 4),
-            "models_used": sorted(j["models_used"]),
-            "stop_reason": j["last_stop_reason"],
+            "job_id": job_id,
+            "name": job_info.get("name", job_id),
+            "enabled": job_info.get("enabled", True),
+            "schedule": job_info.get("schedule", ""),
+            "agent_id": job_info.get("agent_id", ""),
+            "last_status": last_status,
+            "last_run": last_run,
+            "last_duration_ms": last_duration_ms,
+            "last_error": last_error,
+            "next_run": next_run,
+            "total_runs": total_runs,
+            "successful_runs": successful_runs,
+            "success_rate": round(successful_runs / total_runs * 100, 1) if total_runs else 0,
         })
 
-    result.sort(key=lambda x: x["last_run"] or "", reverse=True)
+    # Sort: enabled jobs first, then by name
+    result.sort(key=lambda j: (not j["enabled"], j["name"].lower()))
 
     total_jobs = len(result)
-    successful = sum(1 for j in result if j["status"] == "OK")
-    success_rate = round(successful / total_jobs * 100, 1) if total_jobs else 0
+    enabled_jobs = sum(1 for j in result if j["enabled"])
+    all_runs = sum(j["total_runs"] for j in result)
+    all_ok = sum(j["successful_runs"] for j in result)
+    overall_success = round(all_ok / all_runs * 100, 1) if all_runs else 0
 
     return {
         "total_jobs": total_jobs,
-        "success_rate": success_rate,
+        "enabled_jobs": enabled_jobs,
+        "total_runs": all_runs,
+        "success_rate": overall_success,
         "jobs": result,
     }

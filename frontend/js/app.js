@@ -108,13 +108,29 @@ function updateSystemCards(data) {
     diskEl.className = 'card-value ' + thresholdClass(o.disk_pct, 70, 90);
 }
 
+// --- Format seconds as human-readable duration ---
+function fmtUptime(seconds) {
+    if (!seconds || seconds <= 0) return '--';
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return d + 'd ' + h + 'h';
+    if (h > 0) return h + 'h ' + m + 'm';
+    return m + 'm';
+}
+
 // --- Update uptime cards ---
 function updateUptimeCard(data) {
     const s = data.summary;
     const uptimeEl = document.getElementById('card-uptime');
-    uptimeEl.textContent = s.uptime_pct + '%';
-    // Invert threshold: higher uptime = better
-    uptimeEl.className = 'card-value ' + thresholdClass(100 - s.uptime_pct, 0.5, 5);
+    // Show process uptime duration in the global card
+    if (s.process_uptime_seconds > 0) {
+        uptimeEl.textContent = fmtUptime(s.process_uptime_seconds);
+        uptimeEl.className = 'card-value status-green';
+    } else {
+        uptimeEl.textContent = 'DOWN';
+        uptimeEl.className = 'card-value status-red';
+    }
 }
 
 function updateUptimeTab(data) {
@@ -122,6 +138,12 @@ function updateUptimeTab(data) {
     document.getElementById('uptime-status').innerHTML = s.is_up
         ? '<span class="status-up">UP</span>'
         : '<span class="status-down">DOWN</span>';
+    // Gateway continuous uptime
+    document.getElementById('uptime-duration').textContent = s.is_up
+        ? fmtUptime(s.uptime_seconds)
+        : 'DOWN';
+    // Process uptime
+    document.getElementById('uptime-process').textContent = fmtUptime(s.process_uptime_seconds);
     document.getElementById('uptime-response').textContent = s.response_time_ms + 'ms';
     const pctEl = document.getElementById('uptime-pct');
     pctEl.textContent = s.uptime_pct + '%';
@@ -132,22 +154,33 @@ function updateUptimeTab(data) {
 // --- Update cron cards ---
 function updateCronCards(data) {
     document.getElementById('cron-total').textContent = data.total_jobs;
+    document.getElementById('cron-enabled').textContent = data.enabled_jobs;
+    document.getElementById('cron-runs').textContent = data.total_runs;
     const successEl = document.getElementById('cron-success');
-    successEl.textContent = data.success_rate + '%';
-    successEl.className = 'card-value ' + thresholdClass(100 - data.success_rate, 10, 30);
+    successEl.textContent = data.total_runs > 0 ? data.success_rate + '%' : '--';
+    if (data.total_runs > 0) {
+        successEl.className = 'card-value ' + thresholdClass(100 - data.success_rate, 10, 30);
+    }
+}
+
+function fmtDurationMs(ms) {
+    if (!ms) return '--';
+    const sec = ms / 1000;
+    if (sec < 60) return Math.round(sec) + 's';
+    return fmtDuration(sec / 60);
 }
 
 // --- Cron table - sortable ---
 const CRON_COLS = [
-    { key: 'session_id', type: 'string' },
-    { key: 'status', type: 'string' },
+    { key: 'name', type: 'string' },
+    { key: 'schedule', type: 'string' },
+    { key: 'last_status', type: 'string' },
     { key: 'last_run', type: 'date' },
-    { key: 'duration_minutes', type: 'number' },
-    { key: 'models_used', type: 'string' },
-    { key: 'total_tokens', type: 'number' },
-    { key: 'cost', type: 'number' },
+    { key: 'last_duration_ms', type: 'number' },
+    { key: 'total_runs', type: 'number' },
+    { key: 'success_rate', type: 'number' },
 ];
-let cronSort = { key: 'last_run', asc: false };
+let cronSort = { key: 'name', asc: true };
 let lastCronData = null;
 
 function renderCronRows(jobs) {
@@ -160,11 +193,7 @@ function renderCronRows(jobs) {
     const sorted = [...jobs].sort((a, b) => {
         const col = CRON_COLS.find(c => c.key === cronSort.key);
         let va = a[cronSort.key], vb = b[cronSort.key];
-        if (cronSort.key === 'models_used') {
-            va = Array.isArray(va) ? va.join(', ') : (va || '');
-            vb = Array.isArray(vb) ? vb.join(', ') : (vb || '');
-        }
-        if (col.type === 'string') return cronSort.asc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+        if (col.type === 'string') return cronSort.asc ? String(va || '').localeCompare(String(vb || '')) : String(vb || '').localeCompare(String(va || ''));
         if (col.type === 'date') {
             va = va ? new Date(va).getTime() : 0;
             vb = vb ? new Date(vb).getTime() : 0;
@@ -175,15 +204,18 @@ function renderCronRows(jobs) {
     });
 
     tbody.innerHTML = sorted.map(j => {
-        const statusCls = j.status === 'OK' ? 'style="color:var(--text-primary)"' : 'style="color:var(--accent-red)"';
-        return `<tr>
-            <td class="session-id" data-sid="${esc(j.session_id_full)}" title="${esc(j.session_id_full)}">${esc(j.session_id)}\u2026</td>
-            <td ${statusCls}>${esc(j.status)}</td>
+        const statusColor = j.last_status === 'ok' ? 'color:var(--text-primary)'
+            : j.last_status === 'error' ? 'color:var(--accent-red)'
+            : 'color:var(--text-muted)';
+        const enabledCls = j.enabled ? '' : ' style="opacity:0.5"';
+        return `<tr${enabledCls}>
+            <td>${esc(j.name)}${j.enabled ? '' : ' <span style="color:var(--text-muted)">(off)</span>'}</td>
+            <td>${esc(j.schedule || '--')}</td>
+            <td style="${statusColor}">${esc(j.last_status)}</td>
             <td>${fmtDate(j.last_run)}</td>
-            <td>${fmtDuration(j.duration_minutes)}</td>
-            <td>${esc((j.models_used || []).join(', '))}</td>
-            <td>${fmtTokens(j.total_tokens)}</td>
-            <td>${j.cost != null ? '$' + j.cost.toFixed(2) : '--'}</td>
+            <td>${fmtDurationMs(j.last_duration_ms)}</td>
+            <td>${j.total_runs}</td>
+            <td>${j.total_runs > 0 ? j.success_rate + '%' : '--'}</td>
         </tr>`;
     }).join('');
 
@@ -217,12 +249,7 @@ async function refreshTab(tab) {
         } catch (err) { console.error('uptime fetch error:', err); }
     } else if (tab === 'cron') {
         try {
-            const params = { period: currentPeriod };
-            const dateFrom = document.getElementById('date-from').value;
-            const dateTo = document.getElementById('date-to').value;
-            if (dateFrom) params.start_date = dateFrom + 'T00:00:00+00:00';
-            if (dateTo) params.end_date = dateTo + 'T23:59:59+00:00';
-            const cronData = await API.cron(params);
+            const cronData = await API.cron();
             lastData.cron = cronData;
             updateCronCards(cronData);
             lastCronData = cronData.jobs;
@@ -667,14 +694,6 @@ document.getElementById('cron-table').querySelector('thead').addEventListener('c
         cronSort.asc = col.type === 'string';
     }
     renderCronRows(lastCronData);
-});
-
-// Cron table click-to-copy session ID
-document.getElementById('cron-body').addEventListener('click', (e) => {
-    const td = e.target.closest('.session-id');
-    if (!td) return;
-    const sid = td.dataset.sid;
-    navigator.clipboard.writeText(sid).then(() => showToast('copied: ' + sid));
 });
 
 // Provider tokens/cost toggle

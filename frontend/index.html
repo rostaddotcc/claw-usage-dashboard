@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claw Usage Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="stylesheet" href="/css/style.css?v=14">
+    <link rel="stylesheet" href="/css/style.css?v=16">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.mini.min.js"></script>
 </head>
@@ -274,6 +274,14 @@
                     <div class="card-value" id="uptime-status">--</div>
                 </div>
                 <div class="card">
+                    <div class="card-label">GATEWAY UP</div>
+                    <div class="card-value" id="uptime-duration">--</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">PROCESS UP</div>
+                    <div class="card-value" id="uptime-process">--</div>
+                </div>
+                <div class="card">
                     <div class="card-label">RESPONSE TIME</div>
                     <div class="card-value" id="uptime-response">--</div>
                 </div>
@@ -305,6 +313,14 @@
                     <div class="card-value" id="cron-total">--</div>
                 </div>
                 <div class="card">
+                    <div class="card-label">ENABLED</div>
+                    <div class="card-value" id="cron-enabled">--</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">TOTAL RUNS</div>
+                    <div class="card-value" id="cron-runs">--</div>
+                </div>
+                <div class="card">
                     <div class="card-label">SUCCESS RATE</div>
                     <div class="card-value" id="cron-success">--</div>
                 </div>
@@ -315,13 +331,13 @@
                     <table id="cron-table">
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                <th>NAME</th>
+                                <th>SCHEDULE</th>
                                 <th>STATUS</th>
                                 <th>LAST RUN</th>
                                 <th>DURATION</th>
-                                <th>MODEL</th>
-                                <th>TOKENS</th>
-                                <th>COST</th>
+                                <th>RUNS</th>
+                                <th>SUCCESS</th>
                             </tr>
                         </thead>
                         <tbody id="cron-body"></tbody>
@@ -339,8 +355,8 @@
     </footer>
 
     <div id="toast" class="toast"></div>
-    <script src="/js/api.js?v=14"></script>
-    <script src="/js/charts.js?v=14"></script>
-    <script src="/js/app.js?v=14"></script>
+    <script src="/js/api.js?v=16"></script>
+    <script src="/js/charts.js?v=16"></script>
+    <script src="/js/app.js?v=16"></script>
 </body>
 </html>

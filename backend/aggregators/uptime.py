@@ -6,6 +6,10 @@ def uptime_summary(data: dict[str, Any]) -> dict[str, Any]:
         "is_up": data["current"]["is_up"],
         "response_time_ms": data["current"].get("response_time_ms", 0),
         "uptime_pct": data["uptime_pct"],
+        "uptime_seconds": data.get("uptime_seconds", 0),
+        "up_since": data.get("up_since"),
+        "process_uptime_seconds": data.get("process_uptime_seconds", 0),
+        "started_at": data.get("started_at"),
         "last_check": data["current"].get("timestamp"),
         "total_checks": len(data["history"]),
     }
