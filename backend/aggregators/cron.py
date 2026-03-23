@@ -68,10 +68,33 @@ def aggregate_cron_jobs(data: dict[str, Any]) -> dict[str, Any]:
     all_ok = sum(j["successful_runs"] for j in result)
     overall_success = round(all_ok / all_runs * 100, 1) if all_runs else 0
 
+    # Build flat list of all individual runs for the runs table
+    all_run_entries = []
+    for job_id, job_runs in runs.items():
+        job_name = jobs_def.get(job_id, {}).get("name", job_id)
+        for r in job_runs:
+            ts_ms = r.get("timestamp_ms", 0)
+            ts_iso = None
+            if ts_ms:
+                ts_iso = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
+            all_run_entries.append({
+                "job_id": job_id,
+                "job_name": job_name,
+                "run_id": r.get("run_id", ""),
+                "action": r.get("action", ""),
+                "status": r.get("status", "unknown"),
+                "timestamp": ts_iso,
+                "duration_ms": r.get("duration_ms", 0),
+                "error": r.get("error"),
+                "summary": r.get("summary", ""),
+            })
+    all_run_entries.sort(key=lambda r: r["timestamp"] or "", reverse=True)
+
     return {
         "total_jobs": total_jobs,
         "enabled_jobs": enabled_jobs,
         "total_runs": all_runs,
         "success_rate": overall_success,
         "jobs": result,
+        "runs": all_run_entries,
     }

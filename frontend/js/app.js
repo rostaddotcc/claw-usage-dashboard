@@ -227,6 +227,86 @@ function renderCronRows(jobs) {
     });
 }
 
+// --- Cron runs table - sortable + paginated (same pattern as sessions) ---
+const CRON_RUN_COLS = [
+    { key: 'job_name', type: 'string' },
+    { key: 'status', type: 'string' },
+    { key: 'timestamp', type: 'date' },
+    { key: 'duration_ms', type: 'number' },
+    { key: 'error', type: 'string' },
+    { key: 'summary', type: 'string' },
+];
+let cronRunSort = { key: 'timestamp', asc: false };
+let lastCronRuns = null;
+let cronRunPage = 0;
+const CRON_RUNS_PER_PAGE = 25;
+
+function renderCronRunRows(runs) {
+    const tbody = document.getElementById('cron-runs-body');
+    if (!runs || !runs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted)">no cron runs found</td></tr>';
+        const pag = document.getElementById('cron-runs-pagination');
+        if (pag) pag.style.display = 'none';
+        return;
+    }
+
+    const sorted = [...runs].sort((a, b) => {
+        const col = CRON_RUN_COLS.find(c => c.key === cronRunSort.key);
+        let va = a[cronRunSort.key], vb = b[cronRunSort.key];
+        if (col.type === 'string') return cronRunSort.asc ? String(va || '').localeCompare(String(vb || '')) : String(vb || '').localeCompare(String(va || ''));
+        if (col.type === 'date') {
+            va = va ? new Date(va).getTime() : 0;
+            vb = vb ? new Date(vb).getTime() : 0;
+        }
+        va = va ?? -Infinity;
+        vb = vb ?? -Infinity;
+        return cronRunSort.asc ? va - vb : vb - va;
+    });
+
+    const totalPages = Math.ceil(sorted.length / CRON_RUNS_PER_PAGE);
+    if (cronRunPage >= totalPages) cronRunPage = Math.max(0, totalPages - 1);
+    const start = cronRunPage * CRON_RUNS_PER_PAGE;
+    const page = sorted.slice(start, start + CRON_RUNS_PER_PAGE);
+
+    tbody.innerHTML = page.map(r => {
+        const statusColor = r.status === 'ok' ? 'color:var(--text-primary)'
+            : r.status === 'error' ? 'color:var(--accent-red)'
+            : 'color:var(--text-muted)';
+        const errorText = r.error ? esc(String(r.error).slice(0, 80)) : '--';
+        const summaryText = r.summary ? esc(String(r.summary).slice(0, 60)) : '--';
+        return `<tr>
+            <td>${esc(r.job_name)}</td>
+            <td style="${statusColor}">${esc(r.status)}</td>
+            <td>${fmtDate(r.timestamp)}</td>
+            <td>${fmtDurationMs(r.duration_ms)}</td>
+            <td title="${esc(String(r.error || ''))}" style="font-size:0.7rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${errorText}</td>
+            <td title="${esc(String(r.summary || ''))}" style="font-size:0.7rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${summaryText}</td>
+        </tr>`;
+    }).join('');
+
+    // Sort indicators
+    document.querySelectorAll('#cron-runs-table th').forEach((th, i) => {
+        const col = CRON_RUN_COLS[i];
+        th.classList.toggle('sorted', col.key === cronRunSort.key);
+        th.classList.toggle('asc', col.key === cronRunSort.key && cronRunSort.asc);
+        th.classList.toggle('desc', col.key === cronRunSort.key && !cronRunSort.asc);
+    });
+
+    // Pagination
+    const pag = document.getElementById('cron-runs-pagination');
+    if (pag) {
+        if (totalPages <= 1) {
+            pag.style.display = 'none';
+        } else {
+            pag.style.display = 'flex';
+            pag.querySelector('.page-info').textContent =
+                `${start + 1}\u2013${Math.min(start + CRON_RUNS_PER_PAGE, sorted.length)} of ${sorted.length}`;
+            pag.querySelector('.page-prev').disabled = cronRunPage === 0;
+            pag.querySelector('.page-next').disabled = cronRunPage >= totalPages - 1;
+        }
+    }
+}
+
 // --- Tab-specific data fetching ---
 async function refreshTab(tab) {
     if (tab === 'infra') {
@@ -254,6 +334,12 @@ async function refreshTab(tab) {
             updateCronCards(cronData);
             lastCronData = cronData.jobs;
             renderCronRows(cronData.jobs);
+            // Runs table
+            const countEl = document.getElementById('cron-run-count');
+            if (countEl) countEl.textContent = `(${(cronData.runs || []).length})`;
+            cronRunPage = 0;
+            lastCronRuns = cronData.runs || [];
+            renderCronRunRows(lastCronRuns);
         } catch (err) { console.error('cron fetch error:', err); }
     }
 }
@@ -694,6 +780,35 @@ document.getElementById('cron-table').querySelector('thead').addEventListener('c
         cronSort.asc = col.type === 'string';
     }
     renderCronRows(lastCronData);
+});
+
+// Cron runs table sort handler
+document.getElementById('cron-runs-table').querySelector('thead').addEventListener('click', (e) => {
+    const th = e.target.closest('th');
+    if (!th || !lastCronRuns) return;
+    const idx = Array.from(th.parentElement.children).indexOf(th);
+    const col = CRON_RUN_COLS[idx];
+    if (!col) return;
+    if (cronRunSort.key === col.key) {
+        cronRunSort.asc = !cronRunSort.asc;
+    } else {
+        cronRunSort.key = col.key;
+        cronRunSort.asc = col.type === 'string';
+    }
+    cronRunPage = 0;
+    renderCronRunRows(lastCronRuns);
+});
+
+// Cron runs pagination handler
+document.getElementById('cron-runs-pagination').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn || !lastCronRuns) return;
+    if (btn.classList.contains('page-prev') && cronRunPage > 0) {
+        cronRunPage--;
+    } else if (btn.classList.contains('page-next')) {
+        cronRunPage++;
+    }
+    renderCronRunRows(lastCronRuns);
 });
 
 // Provider tokens/cost toggle

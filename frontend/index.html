@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claw Usage Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="stylesheet" href="/css/style.css?v=16">
+    <link rel="stylesheet" href="/css/style.css?v=17">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.mini.min.js"></script>
 </head>
@@ -344,6 +344,33 @@
                     </table>
                 </div>
             </section>
+            <section class="table-section collapsible">
+                <div class="chart-title collapsible-toggle" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="toggle-arrow">▶</span> Cron Runs <span class="session-count" id="cron-run-count"></span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="table-wrap">
+                        <table id="cron-runs-table">
+                            <thead>
+                                <tr>
+                                    <th>JOB</th>
+                                    <th>STATUS</th>
+                                    <th>TIME</th>
+                                    <th>DURATION</th>
+                                    <th>ERROR</th>
+                                    <th>SUMMARY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cron-runs-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="cron-runs-pagination" style="display:none">
+                        <button class="page-prev">&lt; prev</button>
+                        <span class="page-info"></span>
+                        <button class="page-next">next &gt;</button>
+                    </div>
+                </div>
+            </section>
         </div>
     </main>
 
@@ -355,8 +382,8 @@
     </footer>
 
     <div id="toast" class="toast"></div>
-    <script src="/js/api.js?v=16"></script>
-    <script src="/js/charts.js?v=16"></script>
-    <script src="/js/app.js?v=16"></script>
+    <script src="/js/api.js?v=17"></script>
+    <script src="/js/charts.js?v=17"></script>
+    <script src="/js/app.js?v=17"></script>
 </body>
 </html>
