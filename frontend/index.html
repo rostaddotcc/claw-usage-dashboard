@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claw Usage Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="stylesheet" href="/css/style.css?v=13">
+    <link rel="stylesheet" href="/css/style.css?v=14">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.mini.min.js"></script>
 </head>
@@ -15,7 +15,7 @@
     <header>
         <div class="header-left">
             <span class="prompt">$</span>
-            <h1>claw-usage-dashboard <span class="version">v1.1</span></h1>
+            <h1>claw-usage-dashboard <span class="version">v1.2</span></h1>
             <span class="separator">──</span>
             <span class="subtitle">OpenClaw Usage Dashboard</span>
         </div>
@@ -88,8 +88,28 @@
                 <div class="card-label">COST</div>
                 <div class="card-value" id="card-cost">--</div>
             </div>
+            <div class="card">
+                <div class="card-label">UPTIME</div>
+                <div class="card-value" id="card-uptime">--</div>
+            </div>
+            <div class="card">
+                <div class="card-label">CPU</div>
+                <div class="card-value" id="card-cpu">--</div>
+            </div>
+            <div class="card">
+                <div class="card-label">DISK</div>
+                <div class="card-value" id="card-disk">--</div>
+            </div>
         </section>
 
+        <section class="tab-bar" id="tab-bar">
+            <button class="tab-btn active" data-tab="usage">> USAGE</button>
+            <button class="tab-btn" data-tab="infra">> INFRA</button>
+            <button class="tab-btn" data-tab="uptime">> UPTIME</button>
+            <button class="tab-btn" data-tab="cron">> CRON</button>
+        </section>
+
+        <div class="tab-content active" id="tab-usage">
         <section class="charts-grid">
             <div class="chart-box wide">
                 <div class="chart-title">> Token Usage Over Time</div>
@@ -228,6 +248,87 @@
                 </div>
             </div>
         </section>
+        </div>
+
+        <div class="tab-content" id="tab-infra">
+            <section class="charts-grid">
+                <div class="chart-box wide">
+                    <div class="chart-title">> CPU & RAM Over Time</div>
+                    <div id="chart-cpu-ram"></div>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">> Disk Usage</div>
+                    <div id="chart-disk"></div>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">> Network I/O</div>
+                    <div id="chart-network"></div>
+                </div>
+            </section>
+        </div>
+
+        <div class="tab-content" id="tab-uptime">
+            <section class="cards">
+                <div class="card">
+                    <div class="card-label">STATUS</div>
+                    <div class="card-value" id="uptime-status">--</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">RESPONSE TIME</div>
+                    <div class="card-value" id="uptime-response">--</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">AVAILABILITY</div>
+                    <div class="card-value" id="uptime-pct">--</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">TOTAL CHECKS</div>
+                    <div class="card-value" id="uptime-checks">--</div>
+                </div>
+            </section>
+            <section class="charts-grid">
+                <div class="chart-box wide">
+                    <div class="chart-title">> Response Time Over Time</div>
+                    <div id="chart-response-time"></div>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">> Status Code Distribution</div>
+                    <div id="chart-status-codes"></div>
+                </div>
+            </section>
+        </div>
+
+        <div class="tab-content" id="tab-cron">
+            <section class="cards">
+                <div class="card">
+                    <div class="card-label">TOTAL JOBS</div>
+                    <div class="card-value" id="cron-total">--</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">SUCCESS RATE</div>
+                    <div class="card-value" id="cron-success">--</div>
+                </div>
+            </section>
+            <section class="table-section">
+                <div class="chart-title">> Cron Jobs</div>
+                <div class="table-wrap">
+                    <table id="cron-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>STATUS</th>
+                                <th>LAST RUN</th>
+                                <th>DURATION</th>
+                                <th>MODEL</th>
+                                <th>TOKENS</th>
+                                <th>COST</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cron-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
     </main>
 
     <footer>
@@ -238,8 +339,8 @@
     </footer>
 
     <div id="toast" class="toast"></div>
-    <script src="/js/api.js?v=13"></script>
-    <script src="/js/charts.js?v=13"></script>
-    <script src="/js/app.js?v=13"></script>
+    <script src="/js/api.js?v=14"></script>
+    <script src="/js/charts.js?v=14"></script>
+    <script src="/js/app.js?v=14"></script>
 </body>
 </html>

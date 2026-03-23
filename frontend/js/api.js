@@ -17,4 +17,7 @@ const API = {
     errors(params)   { return this.get('errors', params); },
     sessions(params) { return this.get('sessions', params); },
     tools(params)    { return this.get('tools', params); },
+    system(params)   { return this.get('system', params); },
+    uptime(params)   { return this.get('uptime', params); },
+    cron(params)     { return this.get('cron', params); },
 };

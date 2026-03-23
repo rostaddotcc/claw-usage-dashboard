@@ -3,6 +3,7 @@ const _params = new URLSearchParams(location.search);
 let currentPeriod = _params.get('period') || 'all';
 let currentModel = _params.get('model') || '';
 let currentAgent = _params.get('agent') || '';
+let currentTab = _params.get('tab') || 'usage';
 let allModels = [];
 let allAgents = [];
 let refreshInterval = null;
@@ -13,6 +14,7 @@ function updateURL() {
     if (currentPeriod !== 'all') p.set('period', currentPeriod);
     if (currentModel) p.set('model', currentModel);
     if (currentAgent) p.set('agent', currentAgent);
+    if (currentTab !== 'usage') p.set('tab', currentTab);
     const df = document.getElementById('date-from')?.value;
     const dt = document.getElementById('date-to')?.value;
     if (df) p.set('from', df);
@@ -85,6 +87,148 @@ function updateCards(overview) {
     document.getElementById('card-cache').innerHTML = overview.cache_hit_rate + '%' + trend(overview.cache_hit_rate, p?.cache_hit_rate);
     document.getElementById('card-errors').innerHTML = overview.error_rate + '%' + trend(overview.error_rate, p?.error_rate, true);
     document.getElementById('card-cost').innerHTML = '$' + overview.total_cost.toFixed(2) + trend(overview.total_cost, p?.total_cost, true);
+}
+
+// --- Threshold helper for color-coded cards ---
+function thresholdClass(value, yellowAt, redAt) {
+    if (value >= redAt) return 'status-red';
+    if (value >= yellowAt) return 'status-yellow';
+    return 'status-green';
+}
+
+// --- Update system metric cards ---
+function updateSystemCards(data) {
+    const o = data.overview;
+    const cpuEl = document.getElementById('card-cpu');
+    cpuEl.textContent = o.cpu_pct + '%';
+    cpuEl.className = 'card-value ' + thresholdClass(o.cpu_pct, 70, 90);
+
+    const diskEl = document.getElementById('card-disk');
+    diskEl.textContent = o.disk_pct + '%';
+    diskEl.className = 'card-value ' + thresholdClass(o.disk_pct, 70, 90);
+}
+
+// --- Update uptime cards ---
+function updateUptimeCard(data) {
+    const s = data.summary;
+    const uptimeEl = document.getElementById('card-uptime');
+    uptimeEl.textContent = s.uptime_pct + '%';
+    // Invert threshold: higher uptime = better
+    uptimeEl.className = 'card-value ' + thresholdClass(100 - s.uptime_pct, 0.5, 5);
+}
+
+function updateUptimeTab(data) {
+    const s = data.summary;
+    document.getElementById('uptime-status').innerHTML = s.is_up
+        ? '<span class="status-up">UP</span>'
+        : '<span class="status-down">DOWN</span>';
+    document.getElementById('uptime-response').textContent = s.response_time_ms + 'ms';
+    const pctEl = document.getElementById('uptime-pct');
+    pctEl.textContent = s.uptime_pct + '%';
+    pctEl.className = 'card-value ' + thresholdClass(100 - s.uptime_pct, 0.5, 5);
+    document.getElementById('uptime-checks').textContent = s.total_checks;
+}
+
+// --- Update cron cards ---
+function updateCronCards(data) {
+    document.getElementById('cron-total').textContent = data.total_jobs;
+    const successEl = document.getElementById('cron-success');
+    successEl.textContent = data.success_rate + '%';
+    successEl.className = 'card-value ' + thresholdClass(100 - data.success_rate, 10, 30);
+}
+
+// --- Cron table - sortable ---
+const CRON_COLS = [
+    { key: 'session_id', type: 'string' },
+    { key: 'status', type: 'string' },
+    { key: 'last_run', type: 'date' },
+    { key: 'duration_minutes', type: 'number' },
+    { key: 'models_used', type: 'string' },
+    { key: 'total_tokens', type: 'number' },
+    { key: 'cost', type: 'number' },
+];
+let cronSort = { key: 'last_run', asc: false };
+let lastCronData = null;
+
+function renderCronRows(jobs) {
+    const tbody = document.getElementById('cron-body');
+    if (!jobs || !jobs.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">no cron jobs found</td></tr>';
+        return;
+    }
+
+    const sorted = [...jobs].sort((a, b) => {
+        const col = CRON_COLS.find(c => c.key === cronSort.key);
+        let va = a[cronSort.key], vb = b[cronSort.key];
+        if (cronSort.key === 'models_used') {
+            va = Array.isArray(va) ? va.join(', ') : (va || '');
+            vb = Array.isArray(vb) ? vb.join(', ') : (vb || '');
+        }
+        if (col.type === 'string') return cronSort.asc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+        if (col.type === 'date') {
+            va = va ? new Date(va).getTime() : 0;
+            vb = vb ? new Date(vb).getTime() : 0;
+        }
+        va = va ?? -Infinity;
+        vb = vb ?? -Infinity;
+        return cronSort.asc ? va - vb : vb - va;
+    });
+
+    tbody.innerHTML = sorted.map(j => {
+        const statusCls = j.status === 'OK' ? 'style="color:var(--text-primary)"' : 'style="color:var(--accent-red)"';
+        return `<tr>
+            <td class="session-id" data-sid="${esc(j.session_id_full)}" title="${esc(j.session_id_full)}">${esc(j.session_id)}\u2026</td>
+            <td ${statusCls}>${esc(j.status)}</td>
+            <td>${fmtDate(j.last_run)}</td>
+            <td>${fmtDuration(j.duration_minutes)}</td>
+            <td>${esc((j.models_used || []).join(', '))}</td>
+            <td>${fmtTokens(j.total_tokens)}</td>
+            <td>${j.cost != null ? '$' + j.cost.toFixed(2) : '--'}</td>
+        </tr>`;
+    }).join('');
+
+    document.querySelectorAll('#cron-table th').forEach((th, i) => {
+        const col = CRON_COLS[i];
+        th.classList.toggle('sorted', col.key === cronSort.key);
+        th.classList.toggle('asc', col.key === cronSort.key && cronSort.asc);
+        th.classList.toggle('desc', col.key === cronSort.key && !cronSort.asc);
+    });
+}
+
+// --- Tab-specific data fetching ---
+async function refreshTab(tab) {
+    if (tab === 'infra') {
+        try {
+            const system = await API.system();
+            lastData.system = system;
+            updateSystemCards(system);
+            renderCpuRam(system);
+            renderDiskChart(system);
+            renderNetworkChart(system);
+        } catch (err) { console.error('system fetch error:', err); }
+    } else if (tab === 'uptime') {
+        try {
+            const uptime = await API.uptime();
+            lastData.uptime = uptime;
+            updateUptimeCard(uptime);
+            updateUptimeTab(uptime);
+            renderResponseTime(uptime);
+            renderStatusCodes(uptime);
+        } catch (err) { console.error('uptime fetch error:', err); }
+    } else if (tab === 'cron') {
+        try {
+            const params = { period: currentPeriod };
+            const dateFrom = document.getElementById('date-from').value;
+            const dateTo = document.getElementById('date-to').value;
+            if (dateFrom) params.start_date = dateFrom + 'T00:00:00+00:00';
+            if (dateTo) params.end_date = dateTo + 'T23:59:59+00:00';
+            const cronData = await API.cron(params);
+            lastData.cron = cronData;
+            updateCronCards(cronData);
+            lastCronData = cronData.jobs;
+            renderCronRows(cronData.jobs);
+        } catch (err) { console.error('cron fetch error:', err); }
+    }
 }
 
 // Session table sorting & pagination
@@ -321,33 +465,51 @@ async function refresh() {
     if (currentAgent) params.agent = currentAgent;
 
     try {
-        const [overview, usage, cache, errors, sessions, tools] = await Promise.all([
+        const [overview, usage, cache, errors, sessions, tools, system, uptime] = await Promise.all([
             API.overview(params),
             API.usage(params),
             API.cache(params),
             API.errors(params),
             API.sessions(params),
             API.tools(params),
+            API.system().catch(() => null),
+            API.uptime().catch(() => null),
         ]);
 
-        lastData = { overview, usage, cache, errors, sessions, tools };
+        lastData = { overview, usage, cache, errors, sessions, tools, system, uptime };
         updateCards(overview);
         updateAgentFilter(overview);
         updateModelFilter(usage);
-        renderTimeline(usage);
-        renderCostTimeline(usage);
-        renderByModel(usage);
-        renderCostByModel(usage);
-        renderCache(cache);
-        renderErrors(errors);
-        updateErrorTable(errors);
-        renderByProvider(usage);
-        renderByAgent(usage);
-        renderToolCounts(tools);
-        renderCostForecast(usage, currentPeriod);
-        renderToolTimeline(tools);
-        renderDuration(sessions);
-        updateTable(sessions);
+
+        // Update global summary cards for system/uptime
+        if (system) updateSystemCards(system);
+        if (uptime) updateUptimeCard(uptime);
+
+        // Only render charts for the active tab (ApexCharts needs visible containers)
+        if (currentTab === 'usage') {
+            renderTimeline(usage);
+            renderCostTimeline(usage);
+            renderByModel(usage);
+            renderCostByModel(usage);
+            renderCache(cache);
+            renderErrors(errors);
+            updateErrorTable(errors);
+            renderByProvider(usage);
+            renderByAgent(usage);
+            renderToolCounts(tools);
+            renderCostForecast(usage, currentPeriod);
+            renderToolTimeline(tools);
+            renderDuration(sessions);
+            updateTable(sessions);
+        } else {
+            // Store usage-tab data but render later when tab is activated
+            lastData.usageRendered = false;
+        }
+
+        // Render active tab if not usage
+        if (currentTab !== 'usage') {
+            await refreshTab(currentTab);
+        }
     } catch (err) {
         console.error('fetch error:', err);
     } finally {
@@ -452,6 +614,67 @@ document.getElementById('session-pagination').addEventListener('click', (e) => {
         sessionPage++;
     }
     renderTableRows(sortSessions(lastSessionData, sessionSort.key, sessionSort.asc));
+});
+
+// Tab switching handler
+document.getElementById('tab-bar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    const tab = btn.dataset.tab;
+    if (tab === currentTab) return;
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    const prevTab = currentTab;
+    currentTab = tab;
+    updateURL();
+
+    // If switching to usage and it hasn't been rendered yet, render now
+    if (tab === 'usage' && lastData.usageRendered === false) {
+        lastData.usageRendered = true;
+        if (lastData.usage) {
+            renderTimeline(lastData.usage);
+            renderCostTimeline(lastData.usage);
+            renderByModel(lastData.usage);
+            renderCostByModel(lastData.usage);
+            renderByProvider(lastData.usage);
+            renderByAgent(lastData.usage);
+            renderCostForecast(lastData.usage, currentPeriod);
+        }
+        if (lastData.cache) renderCache(lastData.cache);
+        if (lastData.errors) { renderErrors(lastData.errors); updateErrorTable(lastData.errors); }
+        if (lastData.tools) { renderToolCounts(lastData.tools); renderToolTimeline(lastData.tools); }
+        if (lastData.sessions) { renderDuration(lastData.sessions); updateTable(lastData.sessions); }
+    } else {
+        refreshTab(tab);
+    }
+});
+
+// Cron table sort handler
+document.getElementById('cron-table').querySelector('thead').addEventListener('click', (e) => {
+    const th = e.target.closest('th');
+    if (!th || !lastCronData) return;
+    const idx = Array.from(th.parentElement.children).indexOf(th);
+    const col = CRON_COLS[idx];
+    if (!col) return;
+    if (cronSort.key === col.key) {
+        cronSort.asc = !cronSort.asc;
+    } else {
+        cronSort.key = col.key;
+        cronSort.asc = col.type === 'string';
+    }
+    renderCronRows(lastCronData);
+});
+
+// Cron table click-to-copy session ID
+document.getElementById('cron-body').addEventListener('click', (e) => {
+    const td = e.target.closest('.session-id');
+    if (!td) return;
+    const sid = td.dataset.sid;
+    navigator.clipboard.writeText(sid).then(() => showToast('copied: ' + sid));
 });
 
 // Provider tokens/cost toggle
@@ -759,6 +982,14 @@ if (_fromParam) document.getElementById('date-from').value = _fromParam;
 if (_toParam) document.getElementById('date-to').value = _toParam;
 if (_fromParam || _toParam) {
     document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
+}
+
+// Restore active tab from URL
+if (currentTab !== 'usage') {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === currentTab));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const tabEl = document.getElementById('tab-' + currentTab);
+    if (tabEl) tabEl.classList.add('active');
 }
 
 // Initial load

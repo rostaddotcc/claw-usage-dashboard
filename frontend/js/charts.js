@@ -658,6 +658,163 @@ function renderDuration(data) {
     });
 }
 
+// --- INFRA: CPU & RAM Over Time ---
+function renderCpuRam(data) {
+    const series_data = data.cpu_ram_over_time || [];
+    if (!series_data.length) { clearChart('#chart-cpu-ram'); return; }
+
+    const timestamps = series_data.map(d => d.timestamp.slice(11, 19));
+
+    renderChart('#chart-cpu-ram', {
+        chart: { type: 'line', height: 280 },
+        series: [
+            { name: 'CPU %', data: series_data.map(d => d.cpu) },
+            { name: 'RAM %', data: series_data.map(d => d.ram) },
+        ],
+        colors: ['#00ff41', '#00ffff'],
+        xaxis: {
+            categories: timestamps,
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
+        },
+        yaxis: {
+            min: 0,
+            max: 100,
+            labels: {
+                style: { colors: '#00aa2a', fontSize: '11px' },
+                formatter: val => val.toFixed(0) + '%',
+            },
+        },
+        stroke: { width: 2, curve: 'smooth' },
+        dataLabels: { enabled: false },
+    });
+}
+
+// --- INFRA: Disk Usage gauge ---
+function renderDiskChart(data) {
+    const overview = data.overview;
+    if (!overview) { clearChart('#chart-disk'); return; }
+
+    renderChart('#chart-disk', {
+        chart: { type: 'radialBar', height: 250 },
+        series: [overview.disk_pct],
+        labels: ['Disk'],
+        colors: [overview.disk_pct >= 90 ? '#ff3333' : overview.disk_pct >= 70 ? '#ffaa00' : '#00ff41'],
+        plotOptions: {
+            radialBar: {
+                hollow: { size: '55%' },
+                track: { background: '#1a3a1a' },
+                dataLabels: {
+                    name: {
+                        color: '#00aa2a',
+                        fontSize: '12px',
+                        fontFamily: "'JetBrains Mono', monospace",
+                    },
+                    value: {
+                        color: '#00ff41',
+                        fontSize: '20px',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        formatter: val => val + '%',
+                    },
+                },
+            },
+        },
+    });
+
+    // Update title with details
+    const titleEl = document.querySelector('#chart-disk')?.closest('.chart-box')?.querySelector('.chart-title');
+    if (titleEl) titleEl.textContent = `> Disk Usage (${overview.disk_used_gb}GB / ${overview.disk_total_gb}GB)`;
+}
+
+// --- INFRA: Network I/O ---
+function renderNetworkChart(data) {
+    const net = data.network_over_time || [];
+    if (net.length < 2) { clearChart('#chart-network'); return; }
+
+    const timestamps = net.map(d => d.timestamp.slice(11, 19));
+
+    renderChart('#chart-network', {
+        chart: { type: 'area', height: 250 },
+        series: [
+            { name: 'sent (MB)', data: net.map(d => d.sent_mb) },
+            { name: 'recv (MB)', data: net.map(d => d.recv_mb) },
+        ],
+        colors: ['#ff3333', '#00ffff'],
+        xaxis: {
+            categories: timestamps,
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#00aa2a', fontSize: '11px' },
+                formatter: val => val.toFixed(1) + ' MB',
+            },
+        },
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05, stops: [0, 100] },
+        },
+        stroke: { width: 2, curve: 'smooth' },
+        dataLabels: { enabled: false },
+    });
+}
+
+// --- UPTIME: Response Time Over Time ---
+function renderResponseTime(data) {
+    const rt = data.response_time_over_time || [];
+    if (!rt.length) { clearChart('#chart-response-time'); return; }
+
+    const timestamps = rt.map(d => d.timestamp.slice(11, 19));
+
+    renderChart('#chart-response-time', {
+        chart: { type: 'area', height: 280 },
+        series: [{ name: 'response time (ms)', data: rt.map(d => d.response_time) }],
+        colors: ['#00ffff'],
+        xaxis: {
+            categories: timestamps,
+            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#00aa2a', fontSize: '11px' },
+                formatter: val => Math.round(val) + 'ms',
+            },
+        },
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 100] },
+        },
+        stroke: { width: 2, curve: 'smooth' },
+        dataLabels: { enabled: false },
+    });
+}
+
+// --- UPTIME: Status Code Distribution ---
+function renderStatusCodes(data) {
+    const codes = data.status_codes || {};
+    const entries = Object.entries(codes);
+    if (!entries.length) { clearChart('#chart-status-codes'); return; }
+
+    const labels = entries.map(([k]) => k === '0' ? 'timeout' : k);
+    const values = entries.map(([, v]) => v);
+
+    const colorMap = {
+        '200': '#00ff41', '201': '#00ff41', '204': '#00ff41',
+        '301': '#00ffff', '302': '#00ffff', '304': '#00ffff',
+        '400': '#ffaa00', '401': '#ffaa00', '403': '#ffaa00', '404': '#ffaa00',
+        '500': '#ff3333', '502': '#ff3333', '503': '#ff3333',
+        '0': '#ff3333',
+    };
+    const colors = entries.map(([k]) => colorMap[k] || '#aa55ff');
+
+    renderChart('#chart-status-codes', {
+        chart: { type: 'donut', height: 250 },
+        series: values,
+        labels: labels,
+        colors: colors,
+        ...DONUT_DEFAULTS,
+    });
+}
+
 // Tool Usage Over Time - stacked bar
 function renderToolTimeline(data) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-tools-timeline'); return; }
