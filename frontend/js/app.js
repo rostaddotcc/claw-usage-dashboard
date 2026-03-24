@@ -329,7 +329,12 @@ async function refreshTab(tab) {
         } catch (err) { console.error('uptime fetch error:', err); }
     } else if (tab === 'cron') {
         try {
-            const cronData = await API.cron();
+            const cronParams = { period: currentPeriod };
+            const dateFrom = document.getElementById('date-from').value;
+            const dateTo = document.getElementById('date-to').value;
+            if (dateFrom) cronParams.start_date = dateFrom + 'T00:00:00+00:00';
+            if (dateTo) cronParams.end_date = dateTo + 'T23:59:59+00:00';
+            const cronData = await API.cron(cronParams);
             lastData.cron = cronData;
             updateCronCards(cronData);
             lastCronData = cronData.jobs;
@@ -389,7 +394,7 @@ function renderTableRows(sessions) {
 
     tbody.innerHTML = page.map(s => `
         <tr>
-            <td class="session-id" data-sid="${esc(s.session_id)}" title="${esc(s.session_id)}">${esc(s.session_id.slice(0, 8))}\u2026</td>
+            <td class="session-id" data-sid="${esc(s.session_id_full)}" title="${esc(s.session_id_full)}">${esc(s.session_id)}\u2026</td>
             <td>${esc(s.agent)}</td>
             <td>${esc(s.models_used.join(', '))}</td>
             <td>${fmtTokens(s.total_tokens)}</td>
