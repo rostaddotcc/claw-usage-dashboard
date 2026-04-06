@@ -4,7 +4,7 @@
 
 - `CLAUDE.md` — Detailed architecture docs (collectors, aggregators, routers, data flow)
 - `docker-compose.yml` — Mounts `~/.openclaw` read-only at `/data`
-- `backend/main.py` — FastAPI entry point, 7 API routers
+- `backend/main.py` — FastAPI entry point, 5 API routers
 - `frontend/index.html` — Single-page app, no build step, ApexCharts via CDN
 
 ## Commands
@@ -25,10 +25,12 @@ pip install -r requirements.txt
 **Data flow:** `JSONL files → Collectors → Aggregators → Routers (/api/*) → Frontend`
 
 **Two collectors:**
-- `SessionCollector` — Parses `agents/*/sessions/*.jsonl*` (30s cache TTL), includes cron runs as "cron" agent
+- `SessionCollector` — Parses `agents/*/sessions/*.jsonl*` (60s cache TTL), includes cron runs as "cron" agent
 - `SystemCollector` — CPU/RAM/disk via `psutil` (10s TTL, rolling history)
 
-**API endpoints (7):** `/api/overview`, `/api/usage`, `/api/cache`, `/api/errors`, `/api/sessions`, `/api/tools`, `/api/system`
+**API endpoints (5):** `/api/stats` (overview+cache+errors), `/api/usage`, `/api/sessions`, `/api/tools`, `/api/system`
+
+**ETag caching:** `/api/stats` returns ETag header, supports If-None-Match for 304 responses
 
 ## Important Constraints
 

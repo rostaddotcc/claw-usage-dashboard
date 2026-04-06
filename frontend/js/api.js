@@ -7,17 +7,14 @@ const API = {
             }
         });
         const res = await fetch(url);
+        if (res.status === 304) return null;
         if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
         return res.json();
     },
 
-    overview(params) { return this.get('overview', params); },
+    stats(params)    { return this.get('stats', params); },
     usage(params)    { return this.get('usage', params); },
-    cache(params)    { return this.get('cache', params); },
-    errors(params)   { return this.get('errors', params); },
     sessions(params) { return this.get('sessions', params); },
     tools(params)    { return this.get('tools', params); },
     system(params)   { return this.get('system', params); },
-    uptime(params)   { return this.get('uptime', params); },
-    cron(params)     { return this.get('cron', params); },
 };

@@ -363,15 +363,17 @@ async function refresh() {
     if (currentAgent) params.agent = currentAgent;
 
     try {
-        const [overview, usage, cache, errors, sessions, tools, system] = await Promise.all([
-            API.overview(params),
+        const [stats, usage, sessions, tools, system] = await Promise.all([
+            API.stats(params),
             API.usage(params),
-            API.cache(params),
-            API.errors(params),
             API.sessions(params),
             API.tools(params),
             API.system().catch(() => null),
         ]);
+
+        const overview = stats?.overview || {};
+        const cache = stats?.cache || {};
+        const errors = stats?.errors || {};
 
         lastData = { overview, usage, cache, errors, sessions, tools, system };
         updateCards(overview);
