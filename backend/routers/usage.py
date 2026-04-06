@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 
 from backend.collectors.sessions import collector
-from backend.routers.overview import _period_to_dates
+from backend.routers.stats import _period_to_dates
 from backend.aggregators.usage import (
     aggregate_by_model,
     aggregate_by_provider,

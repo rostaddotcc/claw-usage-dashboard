@@ -3,7 +3,7 @@ from collections import defaultdict
 from fastapi import APIRouter, Query
 
 from backend.collectors.sessions import collector
-from backend.routers.overview import _period_to_dates
+from backend.routers.stats import _period_to_dates
 
 router = APIRouter()
 
@@ -27,15 +27,17 @@ def get_sessions(
 
     records = collector.collect(**filters)
 
-    sessions: dict[str, dict] = defaultdict(lambda: {
-        "agent": "",
-        "models_used": set(),
-        "total_tokens": 0,
-        "message_count": 0,
-        "cost": 0.0,
-        "start_time": None,
-        "end_time": None,
-    })
+    sessions: dict[str, dict] = defaultdict(
+        lambda: {
+            "agent": "",
+            "models_used": set(),
+            "total_tokens": 0,
+            "message_count": 0,
+            "cost": 0.0,
+            "start_time": None,
+            "end_time": None,
+        }
+    )
 
     for r in records:
         s = sessions[r["session_id"]]
@@ -55,19 +57,23 @@ def get_sessions(
     for sid, s in sessions.items():
         duration_min = None
         if s["start_time"] and s["end_time"]:
-            duration_min = round((s["end_time"] - s["start_time"]).total_seconds() / 60, 1)
-        result.append({
-            "session_id": sid[:8],
-            "session_id_full": sid,
-            "agent": s["agent"],
-            "models_used": sorted(s["models_used"]),
-            "total_tokens": s["total_tokens"],
-            "message_count": s["message_count"],
-            "cost": round(s["cost"], 4),
-            "duration_minutes": duration_min,
-            "start_time": s["start_time"].isoformat() if s["start_time"] else None,
-            "end_time": s["end_time"].isoformat() if s["end_time"] else None,
-        })
+            duration_min = round(
+                (s["end_time"] - s["start_time"]).total_seconds() / 60, 1
+            )
+        result.append(
+            {
+                "session_id": sid[:8],
+                "session_id_full": sid,
+                "agent": s["agent"],
+                "models_used": sorted(s["models_used"]),
+                "total_tokens": s["total_tokens"],
+                "message_count": s["message_count"],
+                "cost": round(s["cost"], 4),
+                "duration_minutes": duration_min,
+                "start_time": s["start_time"].isoformat() if s["start_time"] else None,
+                "end_time": s["end_time"].isoformat() if s["end_time"] else None,
+            }
+        )
 
     result.sort(key=lambda x: x["start_time"] or "", reverse=True)
     return {"sessions": result}
