@@ -1,13 +1,14 @@
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
-
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import JSONResponse
 
 from backend.collectors.sessions import collector
-from backend.aggregators.cache import cache_hit_rate
-from backend.aggregators.errors import error_rate
+from backend.aggregators.cache import cache_hit_rate, cache_by_model, cache_over_time
+from backend.aggregators.errors import error_rate, stop_reason_distribution, errors_by_model, errors_over_time
 
 router = APIRouter()
-
 
 PERIOD_DELTAS = {
     "hour": timedelta(hours=1),
@@ -44,12 +45,18 @@ def _prev_period_dates(period: str) -> dict | None:
     }
 
 
-@router.get("/overview")
-def get_overview(
+def _compute_etag(data: dict) -> str:
+    return hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
+
+@router.get("/stats")
+def get_stats(
+    request: Request,
     period: str = Query("all"),
     agent: str | None = Query(None),
     model: str | None = Query(None),
     provider: str | None = Query(None),
+    granularity: str = Query("day"),
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
 ):
@@ -74,7 +81,6 @@ def get_overview(
     start = min((r["timestamp"] for r in records), default=None)
     end = max((r["timestamp"] for r in records), default=None)
 
-    # Compute previous period for trend comparison
     prev = None
     prev_dates = _prev_period_dates(period)
     if prev_dates:
@@ -95,19 +101,38 @@ def get_overview(
             "error_rate": error_rate(prev_records),
         }
 
-    return {
-        "total_tokens": total_tokens,
-        "total_messages": len(records),
-        "total_sessions": len(session_ids),
-        "total_cost": total_cost,
-        "cache_hit_rate": cache_hit_rate(records),
-        "error_rate": error_rate(records),
-        "previous": prev,
-        "agents": agents,
-        "models": models,
-        "providers": providers,
-        "period": {
-            "start": start.isoformat() if start else None,
-            "end": end.isoformat() if end else None,
+    data = {
+        "overview": {
+            "total_tokens": total_tokens,
+            "total_messages": len(records),
+            "total_sessions": len(session_ids),
+            "total_cost": total_cost,
+            "cache_hit_rate": cache_hit_rate(records),
+            "error_rate": error_rate(records),
+            "previous": prev,
+            "agents": agents,
+            "models": models,
+            "providers": providers,
+            "period": {
+                "start": start.isoformat() if start else None,
+                "end": end.isoformat() if end else None,
+            },
+        },
+        "cache": {
+            "overall_rate": cache_hit_rate(records),
+            "by_model": cache_by_model(records),
+            "over_time": cache_over_time(records, granularity),
+        },
+        "errors": {
+            "error_rate": error_rate(records),
+            "stop_reasons": stop_reason_distribution(records),
+            "by_model": errors_by_model(records),
+            "over_time": errors_over_time(records, granularity),
         },
     }
+
+    etag = _compute_etag(data)
+    if request.headers.get("if-none-match") == etag:
+        return JSONResponse(status_code=304, headers={"ETag": etag})
+
+    return JSONResponse(content=data, headers={"ETag": etag})

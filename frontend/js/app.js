@@ -6,7 +6,6 @@ let currentAgent = _params.get('agent') || '';
 let currentTab = _params.get('tab') || 'usage';
 let allModels = [];
 let allAgents = [];
-let refreshInterval = null;
 let lastData = {};
 
 function updateURL() {
@@ -108,205 +107,6 @@ function updateSystemCards(data) {
     diskEl.className = 'card-value ' + thresholdClass(o.disk_pct, 70, 90);
 }
 
-// --- Format seconds as human-readable duration ---
-function fmtUptime(seconds) {
-    if (!seconds || seconds <= 0) return '--';
-    const d = Math.floor(seconds / 86400);
-    const h = Math.floor((seconds % 86400) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    if (d > 0) return d + 'd ' + h + 'h';
-    if (h > 0) return h + 'h ' + m + 'm';
-    return m + 'm';
-}
-
-// --- Update uptime cards ---
-function updateUptimeCard(data) {
-    const s = data.summary;
-    const uptimeEl = document.getElementById('card-uptime');
-    // Show process uptime duration in the global card
-    if (s.process_uptime_seconds > 0) {
-        uptimeEl.textContent = fmtUptime(s.process_uptime_seconds);
-        uptimeEl.className = 'card-value status-green';
-    } else {
-        uptimeEl.textContent = 'DOWN';
-        uptimeEl.className = 'card-value status-red';
-    }
-}
-
-function updateUptimeTab(data) {
-    const s = data.summary;
-    document.getElementById('uptime-status').innerHTML = s.is_up
-        ? '<span class="status-up">UP</span>'
-        : '<span class="status-down">DOWN</span>';
-    // Gateway continuous uptime
-    document.getElementById('uptime-duration').textContent = s.is_up
-        ? fmtUptime(s.uptime_seconds)
-        : 'DOWN';
-    // Process uptime
-    document.getElementById('uptime-process').textContent = fmtUptime(s.process_uptime_seconds);
-    document.getElementById('uptime-response').textContent = s.response_time_ms + 'ms';
-    const pctEl = document.getElementById('uptime-pct');
-    pctEl.textContent = s.uptime_pct + '%';
-    pctEl.className = 'card-value ' + thresholdClass(100 - s.uptime_pct, 0.5, 5);
-    document.getElementById('uptime-checks').textContent = s.total_checks;
-}
-
-// --- Update cron cards ---
-function updateCronCards(data) {
-    document.getElementById('cron-total').textContent = data.total_jobs;
-    document.getElementById('cron-enabled').textContent = data.enabled_jobs;
-    document.getElementById('cron-runs').textContent = data.total_runs;
-    const successEl = document.getElementById('cron-success');
-    successEl.textContent = data.total_runs > 0 ? data.success_rate + '%' : '--';
-    if (data.total_runs > 0) {
-        successEl.className = 'card-value ' + thresholdClass(100 - data.success_rate, 10, 30);
-    }
-}
-
-function fmtDurationMs(ms) {
-    if (!ms) return '--';
-    const sec = ms / 1000;
-    if (sec < 60) return Math.round(sec) + 's';
-    return fmtDuration(sec / 60);
-}
-
-// --- Cron table - sortable ---
-const CRON_COLS = [
-    { key: 'name', type: 'string' },
-    { key: 'schedule', type: 'string' },
-    { key: 'last_status', type: 'string' },
-    { key: 'last_run', type: 'date' },
-    { key: 'last_duration_ms', type: 'number' },
-    { key: 'total_runs', type: 'number' },
-    { key: 'success_rate', type: 'number' },
-];
-let cronSort = { key: 'name', asc: true };
-let lastCronData = null;
-
-function renderCronRows(jobs) {
-    const tbody = document.getElementById('cron-body');
-    if (!jobs || !jobs.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">no cron jobs found</td></tr>';
-        return;
-    }
-
-    const sorted = [...jobs].sort((a, b) => {
-        const col = CRON_COLS.find(c => c.key === cronSort.key);
-        let va = a[cronSort.key], vb = b[cronSort.key];
-        if (col.type === 'string') return cronSort.asc ? String(va || '').localeCompare(String(vb || '')) : String(vb || '').localeCompare(String(va || ''));
-        if (col.type === 'date') {
-            va = va ? new Date(va).getTime() : 0;
-            vb = vb ? new Date(vb).getTime() : 0;
-        }
-        va = va ?? -Infinity;
-        vb = vb ?? -Infinity;
-        return cronSort.asc ? va - vb : vb - va;
-    });
-
-    tbody.innerHTML = sorted.map(j => {
-        const statusColor = j.last_status === 'ok' ? 'color:var(--text-primary)'
-            : j.last_status === 'error' ? 'color:var(--accent-red)'
-            : 'color:var(--text-muted)';
-        const enabledCls = j.enabled ? '' : ' style="opacity:0.5"';
-        return `<tr${enabledCls}>
-            <td>${esc(j.name)}${j.enabled ? '' : ' <span style="color:var(--text-muted)">(off)</span>'}</td>
-            <td>${esc(j.schedule || '--')}</td>
-            <td style="${statusColor}">${esc(j.last_status)}</td>
-            <td>${fmtDate(j.last_run)}</td>
-            <td>${fmtDurationMs(j.last_duration_ms)}</td>
-            <td>${j.total_runs}</td>
-            <td>${j.total_runs > 0 ? j.success_rate + '%' : '--'}</td>
-        </tr>`;
-    }).join('');
-
-    document.querySelectorAll('#cron-table th').forEach((th, i) => {
-        const col = CRON_COLS[i];
-        th.classList.toggle('sorted', col.key === cronSort.key);
-        th.classList.toggle('asc', col.key === cronSort.key && cronSort.asc);
-        th.classList.toggle('desc', col.key === cronSort.key && !cronSort.asc);
-    });
-}
-
-// --- Cron runs table - sortable + paginated (same pattern as sessions) ---
-const CRON_RUN_COLS = [
-    { key: 'job_name', type: 'string' },
-    { key: 'status', type: 'string' },
-    { key: 'timestamp', type: 'date' },
-    { key: 'duration_ms', type: 'number' },
-    { key: 'error', type: 'string' },
-    { key: 'summary', type: 'string' },
-];
-let cronRunSort = { key: 'timestamp', asc: false };
-let lastCronRuns = null;
-let cronRunPage = 0;
-const CRON_RUNS_PER_PAGE = 25;
-
-function renderCronRunRows(runs) {
-    const tbody = document.getElementById('cron-runs-body');
-    if (!runs || !runs.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted)">no cron runs found</td></tr>';
-        const pag = document.getElementById('cron-runs-pagination');
-        if (pag) pag.style.display = 'none';
-        return;
-    }
-
-    const sorted = [...runs].sort((a, b) => {
-        const col = CRON_RUN_COLS.find(c => c.key === cronRunSort.key);
-        let va = a[cronRunSort.key], vb = b[cronRunSort.key];
-        if (col.type === 'string') return cronRunSort.asc ? String(va || '').localeCompare(String(vb || '')) : String(vb || '').localeCompare(String(va || ''));
-        if (col.type === 'date') {
-            va = va ? new Date(va).getTime() : 0;
-            vb = vb ? new Date(vb).getTime() : 0;
-        }
-        va = va ?? -Infinity;
-        vb = vb ?? -Infinity;
-        return cronRunSort.asc ? va - vb : vb - va;
-    });
-
-    const totalPages = Math.ceil(sorted.length / CRON_RUNS_PER_PAGE);
-    if (cronRunPage >= totalPages) cronRunPage = Math.max(0, totalPages - 1);
-    const start = cronRunPage * CRON_RUNS_PER_PAGE;
-    const page = sorted.slice(start, start + CRON_RUNS_PER_PAGE);
-
-    tbody.innerHTML = page.map(r => {
-        const statusColor = r.status === 'ok' ? 'color:var(--text-primary)'
-            : r.status === 'error' ? 'color:var(--accent-red)'
-            : 'color:var(--text-muted)';
-        const errorText = r.error ? esc(String(r.error).slice(0, 80)) : '--';
-        const summaryText = r.summary ? esc(String(r.summary).slice(0, 60)) : '--';
-        return `<tr>
-            <td>${esc(r.job_name)}</td>
-            <td style="${statusColor}">${esc(r.status)}</td>
-            <td>${fmtDate(r.timestamp)}</td>
-            <td>${fmtDurationMs(r.duration_ms)}</td>
-            <td title="${esc(String(r.error || ''))}" style="font-size:0.7rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${errorText}</td>
-            <td title="${esc(String(r.summary || ''))}" style="font-size:0.7rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${summaryText}</td>
-        </tr>`;
-    }).join('');
-
-    // Sort indicators
-    document.querySelectorAll('#cron-runs-table th').forEach((th, i) => {
-        const col = CRON_RUN_COLS[i];
-        th.classList.toggle('sorted', col.key === cronRunSort.key);
-        th.classList.toggle('asc', col.key === cronRunSort.key && cronRunSort.asc);
-        th.classList.toggle('desc', col.key === cronRunSort.key && !cronRunSort.asc);
-    });
-
-    // Pagination
-    const pag = document.getElementById('cron-runs-pagination');
-    if (pag) {
-        if (totalPages <= 1) {
-            pag.style.display = 'none';
-        } else {
-            pag.style.display = 'flex';
-            pag.querySelector('.page-info').textContent =
-                `${start + 1}\u2013${Math.min(start + CRON_RUNS_PER_PAGE, sorted.length)} of ${sorted.length}`;
-            pag.querySelector('.page-prev').disabled = cronRunPage === 0;
-            pag.querySelector('.page-next').disabled = cronRunPage >= totalPages - 1;
-        }
-    }
-}
-
 // --- Tab-specific data fetching ---
 async function refreshTab(tab) {
     if (tab === 'infra') {
@@ -318,42 +118,12 @@ async function refreshTab(tab) {
             renderDiskChart(system);
             renderNetworkChart(system);
         } catch (err) { console.error('system fetch error:', err); }
-    } else if (tab === 'uptime') {
-        try {
-            const uptime = await API.uptime();
-            lastData.uptime = uptime;
-            updateUptimeCard(uptime);
-            updateUptimeTab(uptime);
-            renderResponseTime(uptime);
-            renderStatusCodes(uptime);
-        } catch (err) { console.error('uptime fetch error:', err); }
-    } else if (tab === 'cron') {
-        try {
-            const cronParams = { period: currentPeriod };
-            const dateFrom = document.getElementById('date-from').value;
-            const dateTo = document.getElementById('date-to').value;
-            if (dateFrom) cronParams.start_date = dateFrom + 'T00:00:00+00:00';
-            if (dateTo) cronParams.end_date = dateTo + 'T23:59:59+00:00';
-            const cronData = await API.cron(cronParams);
-            lastData.cron = cronData;
-            updateCronCards(cronData);
-            lastCronData = cronData.jobs;
-            renderCronRows(cronData.jobs);
-            // Runs table
-            const countEl = document.getElementById('cron-run-count');
-            if (countEl) countEl.textContent = `(${(cronData.runs || []).length})`;
-            cronRunPage = 0;
-            lastCronRuns = cronData.runs || [];
-            renderCronRunRows(lastCronRuns);
-        } catch (err) { console.error('cron fetch error:', err); }
     }
 }
 
-// Session table sorting & pagination
+// Session table sorting
 let sessionSort = { key: 'start_time', asc: false };
 let lastSessionData = null;
-let sessionPage = 0;
-const SESSIONS_PER_PAGE = 25;
 
 const SESSION_COLUMNS = [
     { key: 'session_id', type: 'string' },
@@ -387,14 +157,12 @@ function sortSessions(sessions, key, asc) {
 
 function renderTableRows(sessions) {
     const tbody = document.getElementById('sessions-body');
-    const totalPages = Math.ceil(sessions.length / SESSIONS_PER_PAGE);
-    if (sessionPage >= totalPages) sessionPage = Math.max(0, totalPages - 1);
-    const start = sessionPage * SESSIONS_PER_PAGE;
-    const page = sessions.slice(start, start + SESSIONS_PER_PAGE);
+    const countEl = document.getElementById('session-count');
+    if (countEl) countEl.textContent = `(${sessions.length})`;
 
-    tbody.innerHTML = page.map(s => `
+    tbody.innerHTML = sessions.map(s => `
         <tr>
-            <td class="session-id" data-sid="${esc(s.session_id_full)}" title="${esc(s.session_id_full)}">${esc(s.session_id)}\u2026</td>
+            <td class="session-id" data-sid="${esc(s.session_id_full)}" title="${esc(s.session_id_full)}">${esc(s.session_id)}…</td>
             <td>${esc(s.agent)}</td>
             <td>${esc(s.models_used.join(', '))}</td>
             <td>${fmtTokens(s.total_tokens)}</td>
@@ -405,27 +173,12 @@ function renderTableRows(sessions) {
         </tr>
     `).join('');
 
-    // Update sort indicators
     document.querySelectorAll('#sessions-table th').forEach((th, i) => {
         const col = SESSION_COLUMNS[i];
         th.classList.toggle('sorted', col.key === sessionSort.key);
         th.classList.toggle('asc', col.key === sessionSort.key && sessionSort.asc);
         th.classList.toggle('desc', col.key === sessionSort.key && !sessionSort.asc);
     });
-
-    // Update pagination controls
-    const pag = document.getElementById('session-pagination');
-    if (pag) {
-        if (totalPages <= 1) {
-            pag.style.display = 'none';
-        } else {
-            pag.style.display = 'flex';
-            pag.querySelector('.page-info').textContent =
-                `${start + 1}–${Math.min(start + SESSIONS_PER_PAGE, sessions.length)} of ${sessions.length}`;
-            pag.querySelector('.page-prev').disabled = sessionPage === 0;
-            pag.querySelector('.page-next').disabled = sessionPage >= totalPages - 1;
-        }
-    }
 }
 
 // Update sessions table
@@ -434,17 +187,44 @@ function updateTable(data) {
     if (!data.sessions || !data.sessions.length) {
         tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">no sessions found</td></tr>';
         lastSessionData = null;
-        const pag = document.getElementById('session-pagination');
-        if (pag) pag.style.display = 'none';
         return;
     }
 
-    const countEl = document.getElementById('session-count');
-    if (countEl) countEl.textContent = `(${data.sessions.length})`;
+    lastSessionData = sortSessions(data.sessions, sessionSort.key, sessionSort.asc);
+    renderTableRows(lastSessionData);
+}
 
-    sessionPage = 0;
-    lastSessionData = data.sessions;
-    renderTableRows(sortSessions(data.sessions, sessionSort.key, sessionSort.asc));
+// Update Top Sessions table (top 10 by cost)
+function updateTopSessions(data) {
+    const tbody = document.getElementById('top-sessions-body');
+    if (!data.sessions || !data.sessions.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">no sessions found</td></tr>';
+        return;
+    }
+
+    const top10 = [...data.sessions]
+        .filter(s => s.cost != null && s.cost > 0)
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 10);
+
+    if (!top10.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">no cost data available</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = top10.map(s => {
+        const costPerToken = s.total_tokens > 0 ? (s.cost / s.total_tokens) * 1000000 : 0;
+        return `
+        <tr>
+            <td class="session-id" data-sid="${esc(s.session_id_full)}" title="${esc(s.session_id_full)}">${esc(s.session_id)}…</td>
+            <td>${esc(s.agent)}</td>
+            <td>${esc(s.models_used.join(', '))}</td>
+            <td>${fmtTokens(s.total_tokens)}</td>
+            <td>$${s.cost.toFixed(2)}</td>
+            <td>${fmtDuration(s.duration_minutes)}</td>
+            <td>$${costPerToken.toFixed(2)}/1M</td>
+        </tr>
+    `}).join('');
 }
 
 // Stop reasons table — sortable
@@ -583,7 +363,7 @@ async function refresh() {
     if (currentAgent) params.agent = currentAgent;
 
     try {
-        const [overview, usage, cache, errors, sessions, tools, system, uptime] = await Promise.all([
+        const [overview, usage, cache, errors, sessions, tools, system] = await Promise.all([
             API.overview(params),
             API.usage(params),
             API.cache(params),
@@ -591,43 +371,28 @@ async function refresh() {
             API.sessions(params),
             API.tools(params),
             API.system().catch(() => null),
-            API.uptime().catch(() => null),
         ]);
 
-        lastData = { overview, usage, cache, errors, sessions, tools, system, uptime };
+        lastData = { overview, usage, cache, errors, sessions, tools, system };
         updateCards(overview);
         updateAgentFilter(overview);
         updateModelFilter(usage);
 
-        // Update global summary cards for system/uptime
         if (system) updateSystemCards(system);
-        if (uptime) updateUptimeCard(uptime);
 
-        // Only render charts for the active tab (ApexCharts needs visible containers)
-        if (currentTab === 'usage') {
-            renderTimeline(usage);
-            renderCostTimeline(usage);
-            renderByModel(usage);
-            renderCostByModel(usage);
-            renderCache(cache);
-            renderErrors(errors);
-            updateErrorTable(errors);
-            renderByProvider(usage);
-            renderByAgent(usage);
-            renderToolCounts(tools);
-            renderCostForecast(usage, currentPeriod);
-            renderToolTimeline(tools);
-            renderDuration(sessions);
-            updateTable(sessions);
-        } else {
-            // Store usage-tab data but render later when tab is activated
-            lastData.usageRendered = false;
-        }
-
-        // Render active tab if not usage
-        if (currentTab !== 'usage') {
-            await refreshTab(currentTab);
-        }
+        renderTimeline(usage);
+        renderCostTimeline(usage);
+        renderByModel(usage);
+        renderCostByModel(usage);
+        renderCache(cache);
+        renderErrors(errors);
+        updateErrorTable(errors);
+        renderByBreakdown(usage);
+        renderToolCounts(tools);
+        renderModelEfficiency(usage);
+        renderTokenVelocity(usage);
+        updateTable(sessions);
+        updateTopSessions(sessions);
     } catch (err) {
         console.error('fetch error:', err);
     } finally {
@@ -722,17 +487,7 @@ document.getElementById('agent-filter').addEventListener('change', (e) => {
     refresh();
 });
 
-// Session pagination handlers
-document.getElementById('session-pagination').addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn || !lastSessionData) return;
-    if (btn.classList.contains('page-prev') && sessionPage > 0) {
-        sessionPage--;
-    } else if (btn.classList.contains('page-next')) {
-        sessionPage++;
-    }
-    renderTableRows(sortSessions(lastSessionData, sessionSort.key, sessionSort.asc));
-});
+
 
 // Tab switching handler
 document.getElementById('tab-bar').addEventListener('click', (e) => {
@@ -746,103 +501,28 @@ document.getElementById('tab-bar').addEventListener('click', (e) => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
 
-    const prevTab = currentTab;
     currentTab = tab;
     updateURL();
 
-    // If switching to usage and it hasn't been rendered yet, render now
-    if (tab === 'usage' && lastData.usageRendered === false) {
-        lastData.usageRendered = true;
-        if (lastData.usage) {
-            renderTimeline(lastData.usage);
-            renderCostTimeline(lastData.usage);
-            renderByModel(lastData.usage);
-            renderCostByModel(lastData.usage);
-            renderByProvider(lastData.usage);
-            renderByAgent(lastData.usage);
-            renderCostForecast(lastData.usage, currentPeriod);
-        }
-        if (lastData.cache) renderCache(lastData.cache);
-        if (lastData.errors) { renderErrors(lastData.errors); updateErrorTable(lastData.errors); }
-        if (lastData.tools) { renderToolCounts(lastData.tools); renderToolTimeline(lastData.tools); }
-        if (lastData.sessions) { renderDuration(lastData.sessions); updateTable(lastData.sessions); }
-    } else {
+    if (tab === 'sessions') {
+        if (lastData.sessions) updateTable(lastData.sessions);
+    } else if (tab === 'infra') {
         refreshTab(tab);
     }
 });
-
-// Cron table sort handler
-document.getElementById('cron-table').querySelector('thead').addEventListener('click', (e) => {
-    const th = e.target.closest('th');
-    if (!th || !lastCronData) return;
-    const idx = Array.from(th.parentElement.children).indexOf(th);
-    const col = CRON_COLS[idx];
-    if (!col) return;
-    if (cronSort.key === col.key) {
-        cronSort.asc = !cronSort.asc;
-    } else {
-        cronSort.key = col.key;
-        cronSort.asc = col.type === 'string';
-    }
-    renderCronRows(lastCronData);
-});
-
-// Cron runs table sort handler
-document.getElementById('cron-runs-table').querySelector('thead').addEventListener('click', (e) => {
-    const th = e.target.closest('th');
-    if (!th || !lastCronRuns) return;
-    const idx = Array.from(th.parentElement.children).indexOf(th);
-    const col = CRON_RUN_COLS[idx];
-    if (!col) return;
-    if (cronRunSort.key === col.key) {
-        cronRunSort.asc = !cronRunSort.asc;
-    } else {
-        cronRunSort.key = col.key;
-        cronRunSort.asc = col.type === 'string';
-    }
-    cronRunPage = 0;
-    renderCronRunRows(lastCronRuns);
-});
-
-// Cron runs pagination handler
-document.getElementById('cron-runs-pagination').addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn || !lastCronRuns) return;
-    if (btn.classList.contains('page-prev') && cronRunPage > 0) {
-        cronRunPage--;
-    } else if (btn.classList.contains('page-next')) {
-        cronRunPage++;
-    }
-    renderCronRunRows(lastCronRuns);
-});
-
-// Provider tokens/cost toggle
-document.getElementById('toggle-provider').addEventListener('click', (e) => {
+// Breakdown toggle (provider/agent)
+document.getElementById('toggle-breakdown').addEventListener('click', (e) => {
     const btn = e.target.closest('button');
     if (!btn || !lastUsageData) return;
-    document.querySelectorAll('#toggle-provider button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#toggle-breakdown button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    providerMode = btn.dataset.mode;
-    renderByProvider(lastUsageData);
+    breakdownMode = btn.dataset.mode;
+    renderByBreakdown(lastUsageData);
 });
 
-// Agent tokens/cost toggle
-document.getElementById('toggle-agent').addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn || !lastUsageData) return;
-    document.querySelectorAll('#toggle-agent button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    agentMode = btn.dataset.mode;
-    renderByAgent(lastUsageData);
-});
-
-// Period filter click handler
-document.getElementById('period-filter').addEventListener('click', (e) => {
-    if (e.target.tagName !== 'BUTTON') return;
-    document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active');
-    currentPeriod = e.target.dataset.period;
-    // Clear custom date range when using period buttons
+// Period filter change handler
+document.getElementById('period-select').addEventListener('change', (e) => {
+    currentPeriod = e.target.value;
     document.getElementById('date-from').value = '';
     document.getElementById('date-to').value = '';
     updateURL();
@@ -874,16 +554,6 @@ document.getElementById('date-clear').addEventListener('click', () => {
     refresh();
 });
 
-// Auto-refresh handler
-document.getElementById('auto-refresh').addEventListener('change', (e) => {
-    if (refreshInterval) clearInterval(refreshInterval);
-    refreshInterval = null;
-    const seconds = parseInt(e.target.value);
-    if (seconds > 0) {
-        refreshInterval = setInterval(refresh, seconds * 1000);
-    }
-});
-
 // Click-to-copy session ID
 document.getElementById('sessions-body').addEventListener('click', (e) => {
     const td = e.target.closest('.session-id');
@@ -892,236 +562,36 @@ document.getElementById('sessions-body').addEventListener('click', (e) => {
     navigator.clipboard.writeText(sid).then(() => showToast('copied: ' + sid));
 });
 
-// --- Export functions ---
-function exportFilename(ext) {
-    const date = new Date().toISOString().slice(0, 10);
-    return `claw-${currentPeriod}-${date}.${ext}`;
-}
-
-function downloadFile(content, filename, type) {
-    const blob = new Blob([content], { type });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-}
-
-function csvVal(v) {
-    const s = String(v ?? '');
-    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function exportFilterLabel() {
-    const parts = [`Period: ${currentPeriod.toUpperCase()}`];
-    parts.push(`Agent: ${currentAgent || 'ALL'}`);
-    parts.push(`Model: ${currentModel || 'ALL'}`);
-    return parts.join(', ');
-}
-
-function exportCSV() {
-    if (!lastData.overview) return;
-    const o = lastData.overview;
-    const lines = [];
-
-    lines.push('# ' + exportFilterLabel());
-    lines.push('');
-    lines.push('Metric,Value');
-    lines.push(`Total Tokens,${o.total_tokens}`);
-    lines.push(`Total Messages,${o.total_messages}`);
-    lines.push(`Total Sessions,${o.total_sessions}`);
-    lines.push(`Cache Hit Rate (%),${o.cache_hit_rate}`);
-    lines.push(`Error Rate (%),${o.error_rate}`);
-    lines.push(`Total Cost ($),${o.total_cost.toFixed(2)}`);
-    lines.push('');
-
-    const sessions = lastData.sessions?.sessions || [];
-    if (sessions.length) {
-        lines.push('Session ID,Agent,Models,Tokens,Messages,Cost,Duration (min),Start Time');
-        for (const s of sessions) {
-            lines.push([
-                csvVal(s.session_id), csvVal(s.agent),
-                csvVal((s.models_used || []).join('; ')),
-                s.total_tokens, s.message_count,
-                s.cost != null ? s.cost.toFixed(2) : '',
-                s.duration_minutes != null ? Math.round(s.duration_minutes) : '',
-                s.start_time || '',
-            ].join(','));
-        }
-        lines.push('');
-    }
-
-    const byModel = lastData.usage?.by_model || [];
-    if (byModel.length) {
-        lines.push('Model,Input,Output,Cache Read,Total,Cost');
-        for (const m of byModel) {
-            lines.push([csvVal(m.model), m.input, m.output, m.cache_read, m.total,
-                m.cost != null ? m.cost.toFixed(2) : ''].join(','));
-        }
-        lines.push('');
-    }
-
-    const byTool = lastData.tools?.by_tool || [];
-    if (byTool.length) {
-        lines.push('Tool,Count');
-        for (const t of byTool) lines.push(`${csvVal(t.tool)},${t.count}`);
-    }
-
-    downloadFile('\uFEFF' + lines.join('\n'), exportFilename('csv'), 'text/csv;charset=utf-8');
-    showToast('exported ' + exportFilename('csv'));
-}
-
-function exportMD() {
-    if (!lastData.overview) return;
-    const o = lastData.overview;
-    const lines = [];
-
-    lines.push('# Claw Usage Dashboard Export');
-    lines.push('');
-    lines.push(`**${exportFilterLabel()}**`);
-    lines.push('');
-    lines.push('## Summary');
-    lines.push('');
-    lines.push('| Metric | Value |');
-    lines.push('|--------|-------|');
-    lines.push(`| Total Tokens | ${fmtTokens(o.total_tokens)} |`);
-    lines.push(`| Total Messages | ${fmtCount(o.total_messages)} |`);
-    lines.push(`| Total Sessions | ${fmtCount(o.total_sessions)} |`);
-    lines.push(`| Cache Hit Rate | ${o.cache_hit_rate}% |`);
-    lines.push(`| Error Rate | ${o.error_rate}% |`);
-    lines.push(`| Total Cost | $${o.total_cost.toFixed(2)} |`);
-    lines.push('');
-
-    const byModel = lastData.usage?.by_model || [];
-    if (byModel.length) {
-        lines.push('## Usage by Model');
-        lines.push('');
-        lines.push('| Model | Input | Output | Cache Read | Total | Cost |');
-        lines.push('|-------|-------|--------|------------|-------|------|');
-        for (const m of byModel) {
-            lines.push(`| ${m.model} | ${fmtTokens(m.input)} | ${fmtTokens(m.output)} | ${fmtTokens(m.cache_read)} | ${fmtTokens(m.total)} | ${m.cost != null ? '$' + m.cost.toFixed(2) : '--'} |`);
-        }
-        lines.push('');
-    }
-
-    const byTool = lastData.tools?.by_tool || [];
-    if (byTool.length) {
-        lines.push('## Tool Usage');
-        lines.push('');
-        lines.push('| Tool | Count |');
-        lines.push('|------|-------|');
-        for (const t of byTool) lines.push(`| ${t.tool} | ${fmtCount(t.count)} |`);
-        lines.push('');
-    }
-
-    const sessions = lastData.sessions?.sessions || [];
-    if (sessions.length) {
-        lines.push('## Sessions');
-        lines.push('');
-        lines.push('| ID | Agent | Model | Tokens | Msgs | Cost | Duration | Time |');
-        lines.push('|----|-------|-------|--------|------|------|----------|------|');
-        for (const s of sessions) {
-            lines.push(`| ${s.session_id.slice(0, 8)}… | ${s.agent} | ${(s.models_used || []).join(', ')} | ${fmtTokens(s.total_tokens)} | ${s.message_count} | ${s.cost != null ? '$' + s.cost.toFixed(2) : '--'} | ${fmtDuration(s.duration_minutes)} | ${fmtDate(s.start_time)} |`);
-        }
-    }
-
-    downloadFile(lines.join('\n'), exportFilename('md'), 'text/markdown;charset=utf-8');
-    showToast('exported ' + exportFilename('md'));
-}
-
-function exportXLSX() {
-    if (!lastData.overview || typeof XLSX === 'undefined') {
-        showToast('XLSX library not loaded');
-        return;
-    }
-    const o = lastData.overview;
-    const wb = XLSX.utils.book_new();
-
-    // Summary sheet
-    const summary = [
-        ['Claw Usage Dashboard Export'],
-        [exportFilterLabel()],
-        [],
-        ['Metric', 'Value'],
-        ['Total Tokens', o.total_tokens],
-        ['Total Messages', o.total_messages],
-        ['Total Sessions', o.total_sessions],
-        ['Cache Hit Rate (%)', o.cache_hit_rate],
-        ['Error Rate (%)', o.error_rate],
-        ['Total Cost ($)', o.total_cost],
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
-
-    // Sessions sheet
-    const sessions = lastData.sessions?.sessions || [];
-    if (sessions.length) {
-        const rows = [['Session ID', 'Agent', 'Models', 'Tokens', 'Messages', 'Cost ($)', 'Duration (min)', 'Start Time']];
-        for (const s of sessions) {
-            rows.push([
-                s.session_id, s.agent, (s.models_used || []).join(', '),
-                s.total_tokens, s.message_count, s.cost ?? '',
-                s.duration_minutes != null ? Math.round(s.duration_minutes) : '',
-                s.start_time || '',
-            ]);
-        }
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Sessions');
-    }
-
-    // Usage by Model sheet
-    const byModel = lastData.usage?.by_model || [];
-    if (byModel.length) {
-        const rows = [['Model', 'Input', 'Output', 'Cache Read', 'Total', 'Cost ($)']];
-        for (const m of byModel) rows.push([m.model, m.input, m.output, m.cache_read, m.total, m.cost ?? '']);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Model');
-    }
-
-    // By Provider sheet
-    const byProvider = lastData.usage?.by_provider || [];
-    if (byProvider.length) {
-        const rows = [['Provider', 'Total Tokens', 'Cost ($)']];
-        for (const p of byProvider) rows.push([p.provider, p.total, p.cost ?? '']);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Provider');
-    }
-
-    // By Agent sheet
-    const byAgent = lastData.usage?.by_agent || [];
-    if (byAgent.length) {
-        const rows = [['Agent', 'Total Tokens', 'Cost ($)']];
-        for (const a of byAgent) rows.push([a.agent, a.total, a.cost ?? '']);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Agent');
-    }
-
-    // Tool Usage sheet
-    const byTool = lastData.tools?.by_tool || [];
-    if (byTool.length) {
-        const rows = [['Tool', 'Count']];
-        for (const t of byTool) rows.push([t.tool, t.count]);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Tools');
-    }
-
-    XLSX.writeFile(wb, exportFilename('xlsx'));
-    showToast('exported ' + exportFilename('xlsx'));
-}
-
-// Export button handlers
-document.getElementById('export-csv').addEventListener('click', exportCSV);
-document.getElementById('export-md').addEventListener('click', exportMD);
-document.getElementById('export-xlsx').addEventListener('click', exportXLSX);
-
-// Restore active period button and date range from URL
-document.querySelectorAll('.period-filter button').forEach(b => {
-    b.classList.toggle('active', b.dataset.period === currentPeriod);
+// Click-to-copy top sessions ID
+document.getElementById('top-sessions-body').addEventListener('click', (e) => {
+    const td = e.target.closest('.session-id');
+    if (!td) return;
+    const sid = td.dataset.sid;
+    navigator.clipboard.writeText(sid).then(() => showToast('copied: ' + sid));
 });
+
+// Theme selector
+const themeSelect = document.getElementById('theme-select');
+const savedTheme = localStorage.getItem('theme') || 'green';
+if (themeSelect) {
+    themeSelect.value = savedTheme;
+    document.body.setAttribute('data-theme', savedTheme);
+    themeSelect.addEventListener('change', (e) => {
+        const theme = e.target.value;
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    });
+}
+
+// Restore filters from URL
 const _fromParam = _params.get('from');
 const _toParam = _params.get('to');
 if (_fromParam) document.getElementById('date-from').value = _fromParam;
 if (_toParam) document.getElementById('date-to').value = _toParam;
-if (_fromParam || _toParam) {
-    document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
-}
+
+// Set period dropdown
+const periodSelect = document.getElementById('period-select');
+if (periodSelect) periodSelect.value = currentPeriod;
 
 // Restore active tab from URL
 if (currentTab !== 'usage') {

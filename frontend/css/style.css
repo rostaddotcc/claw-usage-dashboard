@@ -733,3 +733,60 @@ footer {
         padding: 0.4rem 0.8rem;
     }
 }
+
+/* Theme variants */
+[data-theme="cyan"] {
+    --text-primary: #00ffff;
+    --text-dim: #00aaaa;
+    --text-muted: #005555;
+    --border: #1a3a3a;
+    --border-bright: #2a5a5a;
+    --glow: 0 0 10px rgba(0, 255, 255, 0.3);
+    --glow-strong: 0 0 20px rgba(0, 255, 255, 0.4);
+}
+
+[data-theme="amber"] {
+    --text-primary: #ffaa00;
+    --text-dim: #aa7700;
+    --text-muted: #554400;
+    --border: #3a2a1a;
+    --border-bright: #5a3a2a;
+    --glow: 0 0 10px rgba(255, 170, 0, 0.3);
+    --glow-strong: 0 0 20px rgba(255, 170, 0, 0.4);
+}
+
+[data-theme="purple"] {
+    --text-primary: #aa55ff;
+    --text-dim: #7733aa;
+    --text-muted: #442255;
+    --border: #2a1a3a;
+    --border-bright: #3a2a5a;
+    --glow: 0 0 10px rgba(170, 85, 255, 0.3);
+    --glow-strong: 0 0 20px rgba(170, 85, 255, 0.4);
+}
+
+/* Theme selector styling */
+.theme-selector {
+    margin-left: 0.5rem;
+}
+
+.theme-selector select {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.35rem 0.6rem;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    outline: none;
+}
+
+.theme-selector select:hover {
+    border-color: var(--border-bright);
+}
+
+.theme-selector select:focus {
+    border-color: var(--text-primary);
+    box-shadow: var(--glow);
+}
