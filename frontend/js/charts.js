@@ -215,15 +215,16 @@ function renderCostByModel(data) {
     renderChart('#chart-cost-by-model', {
         chart: { type: 'bar', height: Math.max(220, models.length * 36) },
         series: [{ name: 'cost', data: costs }],
-        colors: [{
+        colors: ['#c45c6a'],
+        fill: {
             type: 'gradient',
             gradient: { shadeFrom: 'light', shadeTo: 'dark', stops: [0, 100], colorStops: [
                 { offset: 0, color: '#e8a0a0', opacity: 1 },
                 { offset: 100, color: '#c45c6a', opacity: 1 },
             ]},
-        }],
+        },
         plotOptions: {
-            bar: {
+bar: {
                 horizontal: true,
                 borderRadius: 6,
                 barHeight: '55%',
@@ -411,13 +412,14 @@ function renderToolCounts(data) {
     renderChart('#chart-tools', {
         chart: { type: 'bar', height: Math.max(220, tools.length * 32) },
         series: [{ name: 'calls', data: counts }],
-        colors: [{
+        colors: ['#d4884a'],
+        fill: {
             type: 'gradient',
             gradient: { shadeFrom: 'light', shadeTo: 'dark', stops: [0, 100], colorStops: [
                 { offset: 0, color: '#e8c0a0', opacity: 1 },
                 { offset: 100, color: '#d4884a', opacity: 1 },
             ]},
-        }],
+        },
         plotOptions: {
             bar: {
                 horizontal: true,
@@ -565,13 +567,14 @@ function renderModelEfficiency(data) {
     renderChart('#chart-model-efficiency', {
         chart: { type: 'bar', height: Math.max(220, models.length * 36) },
         series: [{ name: '$/1M tokens', data: costs }],
-        colors: [{
+        colors: ['#5a8fbf'],
+        fill: {
             type: 'gradient',
             gradient: { shadeFrom: 'light', shadeTo: 'dark', stops: [0, 100], colorStops: [
                 { offset: 0, color: '#a0c0e8', opacity: 1 },
                 { offset: 100, color: '#5a8fbf', opacity: 1 },
             ]},
-        }],
+        },
         plotOptions: {
             bar: {
                 horizontal: true,
