@@ -5,8 +5,12 @@ from fastapi import APIRouter, Query
 
 from backend.collectors.sessions import collector
 from backend.config import DATA_DIR, AGENTS_SUBDIR
-from backend.routers.overview import _period_to_dates
-from backend.aggregators.tools import tool_counts, tool_usage_over_time, tool_usage_by_agent
+from backend.routers.stats import _period_to_dates
+from backend.aggregators.tools import (
+    tool_counts,
+    tool_usage_over_time,
+    tool_usage_by_agent,
+)
 
 router = APIRouter()
 
@@ -43,17 +47,21 @@ def debug_tools(limit: int = Query(5)):
     """Show sample records to diagnose tool parsing."""
     records = collector.collect()
     with_tools = [r for r in records if r.get("tools")]
-    tool_use_stops = [r for r in records if r.get("stop_reason") in ("toolUse", "tool_use")]
+    tool_use_stops = [
+        r for r in records if r.get("stop_reason") in ("toolUse", "tool_use")
+    ]
 
     samples = []
     for r in (with_tools or tool_use_stops)[:limit]:
-        samples.append({
-            "session_id": r["session_id"][:8],
-            "stop_reason": r["stop_reason"],
-            "tools": r.get("tools", []),
-            "model": r["model"],
-            "timestamp": r["timestamp"].isoformat(),
-        })
+        samples.append(
+            {
+                "session_id": r["session_id"][:8],
+                "stop_reason": r["stop_reason"],
+                "tools": r.get("tools", []),
+                "model": r["model"],
+                "timestamp": r["timestamp"].isoformat(),
+            }
+        )
 
     return {
         "total_records": len(records),
@@ -89,7 +97,10 @@ def raw_jsonl(lines: int = Query(10)):
                             continue
                         # Find entries that have toolUse stop reason
                         msg = entry.get("message", {})
-                        if msg.get("stopReason") == "toolUse" or entry.get("stopReason") == "toolUse":
+                        if (
+                            msg.get("stopReason") == "toolUse"
+                            or entry.get("stopReason") == "toolUse"
+                        ):
                             # Show top-level keys and message keys (truncate content)
                             summary = {"_top_keys": list(entry.keys())}
                             if "message" in entry:
@@ -99,20 +110,34 @@ def raw_jsonl(lines: int = Query(10)):
                                     content = entry["message"]["content"]
                                     if isinstance(content, list):
                                         summary["_msg_content_types"] = [
-                                            {k: v for k, v in b.items() if k in ("type", "name", "id")}
-                                            for b in content if isinstance(b, dict)
+                                            {
+                                                k: v
+                                                for k, v in b.items()
+                                                if k in ("type", "name", "id")
+                                            }
+                                            for b in content
+                                            if isinstance(b, dict)
                                         ]
                                     else:
-                                        summary["_msg_content_type"] = type(content).__name__
+                                        summary["_msg_content_type"] = type(
+                                            content
+                                        ).__name__
                             if "content" in entry:
                                 content = entry["content"]
                                 if isinstance(content, list):
                                     summary["_entry_content_types"] = [
-                                        {k: v for k, v in b.items() if k in ("type", "name", "id")}
-                                        for b in content if isinstance(b, dict)
+                                        {
+                                            k: v
+                                            for k, v in b.items()
+                                            if k in ("type", "name", "id")
+                                        }
+                                        for b in content
+                                        if isinstance(b, dict)
                                     ]
                                 else:
-                                    summary["_entry_content_type"] = type(content).__name__
+                                    summary["_entry_content_type"] = type(
+                                        content
+                                    ).__name__
                             results.append(summary)
                             if len(results) >= lines:
                                 return {"count": len(results), "entries": results}
