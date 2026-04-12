@@ -261,19 +261,15 @@ function renderByModel(data) {
         series: [
             { name: 'input', data: grouped.map(d => d.input) },
             { name: 'output', data: grouped.map(d => d.output) },
-            { name: 'cache_read', data: grouped.map(d => d.cache_read) },
+            { name: 'cache', data: grouped.map(d => d.cache_read) },
         ],
-        colors: ['#d4884a', '#d4a03a', '#5a8fbf'],
+        colors: ['#d4884a', '#c45c6a', '#5a9e6f'],
         plotOptions: {
             bar: {
                 horizontal: true,
                 borderRadius: 6,
                 barHeight: '55%',
             },
-        },
-        fill: {
-            type: 'gradient',
-            gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.3, stops: [0, 100] },
         },
         xaxis: {
             categories: models,

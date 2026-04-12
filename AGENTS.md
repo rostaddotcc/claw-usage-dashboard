@@ -69,6 +69,12 @@ Session files at `$DATA_DIR/agents/<agentId>/sessions/<sessionId>.jsonl*`:
 - Top Sessions table shows 10 most expensive sessions
 - Design: warm light theme with Inter font, soft rounded cards, dot-pattern background, gradient area charts, no terminal aesthetic
 
+## ApexCharts Gotchas
+
+- **Horizontal bars**: yaxis shows categories (strings), xaxis shows values — put `formatter` on xaxis only, never on yaxis (formats strings → NaN)
+- **Gradient fills**: must be in `fill` property, not in `colors` array (ApexCharts rejects gradient objects there)
+- **Defaults merge**: `CHART_DEFAULTS` is deep-merged into all charts — be careful with global formatters/labels
+
 ## Known Issues
 
 - Cloudflare Rocket Loader rewrites `<script>` tags — breaks JS execution. Disable for this site.
