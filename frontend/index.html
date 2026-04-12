@@ -5,28 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claw Usage Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="stylesheet" href="/css/style.css?v=22">
+    <link rel="stylesheet" href="/css/style.css?v=25">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 <body>
-    <div class="scanlines"></div>
-
     <header>
         <div class="header-left">
-            <span class="prompt">$</span>
-            <h1>claw-usage-dashboard <span class="version">v1.5</span></h1>
-            <span class="separator">──</span>
-            <span class="subtitle">OpenClaw Usage Dashboard</span>
+            <h1>Claw Usage Dashboard <span class="version">v1.5</span></h1>
+            <span class="subtitle">OpenClaw usage analytics</span>
         </div>
         <div class="header-right">
             <div class="agent-filter">
                 <select id="agent-filter">
-                    <option value="">ALL AGENTS</option>
+                    <option value="">All agents</option>
                 </select>
             </div>
             <div class="model-filter">
                 <select id="model-filter">
-                    <option value="">ALL MODELS</option>
+                    <option value="">All models</option>
                 </select>
             </div>
             <div class="period-filter">
@@ -38,15 +34,15 @@
                     <option value="quarter">3M</option>
                     <option value="half">6M</option>
                     <option value="year">12M</option>
-                    <option value="all" selected>ALL</option>
+                    <option value="all" selected>All</option>
                 </select>
             </div>
             <div class="theme-selector">
                 <select id="theme-select">
-                    <option value="green">🟢 green</option>
-                    <option value="cyan">🔵 cyan</option>
-                    <option value="amber">🟡 amber</option>
-                    <option value="purple">🟣 purple</option>
+                    <option value="orange">Orange</option>
+                    <option value="amber">Amber</option>
+                    <option value="rose">Rose</option>
+                    <option value="sage">Sage</option>
                 </select>
             </div>
             <div class="date-range">
@@ -60,73 +56,73 @@
 
     <main>
         <section class="cards" id="cards">
-            <div class="card">
-                <div class="card-label">TOKENS</div>
+            <div class="card card-tokens">
+                <div class="card-label">Tokens</div>
                 <div class="card-value" id="card-tokens">--</div>
             </div>
-            <div class="card">
-                <div class="card-label">MESSAGES</div>
+            <div class="card card-messages">
+                <div class="card-label">Messages</div>
                 <div class="card-value" id="card-messages">--</div>
             </div>
-            <div class="card">
-                <div class="card-label">SESSIONS</div>
+            <div class="card card-sessions">
+                <div class="card-label">Sessions</div>
                 <div class="card-value" id="card-sessions">--</div>
             </div>
-            <div class="card">
-                <div class="card-label">CACHE HIT</div>
+            <div class="card card-cache">
+                <div class="card-label">Cache hit</div>
                 <div class="card-value" id="card-cache">--</div>
             </div>
-            <div class="card">
-                <div class="card-label">ERRORS</div>
+            <div class="card card-errors">
+                <div class="card-label">Errors</div>
                 <div class="card-value" id="card-errors">--</div>
             </div>
-            <div class="card">
-                <div class="card-label">COST</div>
+            <div class="card card-cost">
+                <div class="card-label">Cost</div>
                 <div class="card-value" id="card-cost">--</div>
             </div>
         </section>
 
         <section class="tab-bar" id="tab-bar">
-            <button class="tab-btn active" data-tab="usage">> USAGE</button>
-            <button class="tab-btn" data-tab="infra">> INFRA</button>
-            <button class="tab-btn" data-tab="sessions">> SESSIONS</button>
+            <button class="tab-btn active" data-tab="usage">Usage</button>
+            <button class="tab-btn" data-tab="infra">Infra</button>
+            <button class="tab-btn" data-tab="sessions">Sessions</button>
         </section>
 
         <div class="tab-content active" id="tab-usage">
         <section class="charts-grid">
             <div class="chart-box wide">
-                <div class="chart-title">> Token Usage Over Time</div>
+                <div class="chart-title">Token usage over time</div>
                 <div id="chart-timeline"></div>
             </div>
 
             <div class="chart-box wide">
-                <div class="chart-title">> Cost Over Time</div>
+                <div class="chart-title">Cost over time</div>
                 <div id="chart-cost-timeline"></div>
             </div>
 
             <div class="chart-box">
-                <div class="chart-title">> Usage by Model</div>
+                <div class="chart-title">Usage by model</div>
                 <div id="chart-by-model"></div>
             </div>
 
             <div class="chart-box">
-                <div class="chart-title">> Cost by Model</div>
+                <div class="chart-title">Cost by model</div>
                 <div id="chart-cost-by-model"></div>
             </div>
 
             <div class="chart-box">
-                <div class="chart-title">> Cache Hit Rate</div>
+                <div class="chart-title">Cache hit rate</div>
                 <div id="chart-cache"></div>
             </div>
 
             <div class="chart-box">
-                <div class="chart-title">> Stop Reasons</div>
+                <div class="chart-title">Stop reasons</div>
                 <div id="chart-errors"></div>
             </div>
 
             <div class="chart-box">
                 <div class="chart-title">
-                    > By Provider / Agent
+                    By provider / agent
                     <span class="chart-toggle" id="toggle-breakdown">
                         <button class="active" data-mode="provider">provider</button>
                         <button data-mode="agent">agent</button>
@@ -136,34 +132,35 @@
             </div>
 
             <div class="chart-box">
-                <div class="chart-title">> Tool Usage</div>
+                <div class="chart-title">Tool usage</div>
                 <div id="chart-tools"></div>
             </div>
 
             <div class="chart-box">
-                <div class="chart-title">> Model Cost Efficiency</div>
+                <div class="chart-title">Model cost efficiency</div>
                 <div id="chart-model-efficiency"></div>
             </div>
 
             <div class="chart-box wide">
-                <div class="chart-title">> Token Velocity</div>
+                <div class="chart-title">Token velocity</div>
                 <div id="chart-token-velocity"></div>
             </div>
         </section>
 
         <section class="table-section">
-            <div class="chart-title">> Top Sessions (by cost)</div>
+            <div class="chart-title">Top sessions by cost</div>
             <div class="table-wrap">
                 <table id="top-sessions-table">
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>AGENT</th>
-                            <th>MODEL</th>
-                            <th>TOKENS</th>
-                            <th>COST</th>
-                            <th>DURATION</th>
-                            <th>COST/TOK</th>
+                            <th>Agent</th>
+                            <th>Model</th>
+                            <th>Tokens</th>
+                            <th>Cost</th>
+                            <th>Duration</th>
+                            <th>Time</th>
+                            <th>Cost/tok</th>
                         </tr>
                     </thead>
                     <tbody id="top-sessions-body"></tbody>
@@ -172,29 +169,29 @@
         </section>
 
         <section class="table-section">
-            <div class="chart-title">> Stop Reasons <span class="session-count" id="error-count"></span></div>
+            <div class="chart-title">Stop reasons <span class="session-count" id="error-count"></span></div>
             <div class="table-wrap">
                 <table id="stop-reasons-table">
                     <thead>
                         <tr>
-                            <th>REASON</th>
-                            <th>COUNT</th>
+                            <th>Reason</th>
+                            <th>Count</th>
                             <th>%</th>
-                            <th>STATUS</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody id="errors-body"></tbody>
                 </table>
             </div>
-            <div class="chart-title" style="margin-top:1rem">> Errors by Model</div>
+            <div class="chart-title" style="margin-top:1rem">Errors by model</div>
             <div class="table-wrap">
                 <table id="errors-by-model-table">
                     <thead>
                         <tr>
-                            <th>MODEL</th>
-                            <th>ERRORS</th>
-                            <th>ERROR RATE</th>
-                            <th>REASONS</th>
+                            <th>Model</th>
+                            <th>Errors</th>
+                            <th>Error rate</th>
+                            <th>Reasons</th>
                         </tr>
                     </thead>
                     <tbody id="errors-by-model-body"></tbody>
@@ -205,19 +202,19 @@
 
         <div class="tab-content" id="tab-sessions">
             <section class="table-section">
-                <div class="chart-title">> All Sessions <span class="session-count" id="session-count"></span></div>
+                <div class="chart-title">All sessions <span class="session-count" id="session-count"></span></div>
                 <div class="table-wrap">
                     <table id="sessions-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>AGENT</th>
-                                <th>MODEL</th>
-                                <th>TOKENS</th>
-                                <th>MSGS</th>
-                                <th>COST</th>
-                                <th>DURATION</th>
-                                <th>TIME</th>
+                                <th>Agent</th>
+                                <th>Model</th>
+                                <th>Tokens</th>
+                                <th>Msgs</th>
+                                <th>Cost</th>
+                                <th>Duration</th>
+                                <th>Time</th>
                             </tr>
                         </thead>
                         <tbody id="sessions-body"></tbody>
@@ -229,15 +226,15 @@
         <div class="tab-content" id="tab-infra">
             <section class="charts-grid">
                 <div class="chart-box wide">
-                    <div class="chart-title">> CPU & RAM Over Time</div>
+                    <div class="chart-title">CPU & RAM over time</div>
                     <div id="chart-cpu-ram"></div>
                 </div>
                 <div class="chart-box">
-                    <div class="chart-title">> Disk Usage</div>
+                    <div class="chart-title">Disk usage</div>
                     <div id="chart-disk"></div>
                 </div>
                 <div class="chart-box">
-                    <div class="chart-title">> Network I/O</div>
+                    <div class="chart-title">Network I/O</div>
                     <div id="chart-network"></div>
                 </div>
             </section>
@@ -245,15 +242,15 @@
     </main>
 
     <footer>
-        <span class="prompt">></span> ready<span class="cursor">_</span>
+        <span>Claw Usage Dashboard</span>
         <span class="footer-links">
             <a href="https://github.com/rostad-cc/claw-usage-dashboard" target="_blank" rel="noopener">github</a>
         </span>
     </footer>
 
     <div id="toast" class="toast"></div>
-    <script src="/js/api.js?v=22"></script>
-    <script src="/js/charts.js?v=22"></script>
-    <script src="/js/app.js?v=22"></script>
+    <script src="/js/api.js?v=25"></script>
+    <script src="/js/charts.js?v=25"></script>
+    <script src="/js/app.js?v=25"></script>
 </body>
 </html>

@@ -188,7 +188,7 @@ function renderTableRows(sessions) {
 function updateTable(data) {
     const tbody = document.getElementById('sessions-body');
     if (!data.sessions || !data.sessions.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">no sessions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">No sessions found</td></tr>';
         lastSessionData = null;
         return;
     }
@@ -201,7 +201,7 @@ function updateTable(data) {
 function updateTopSessions(data) {
     const tbody = document.getElementById('top-sessions-body');
     if (!data.sessions || !data.sessions.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">no sessions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">No sessions found</td></tr>';
         return;
     }
 
@@ -211,7 +211,7 @@ function updateTopSessions(data) {
         .slice(0, 10);
 
     if (!top10.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">no cost data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">No cost data available</td></tr>';
         return;
     }
 
@@ -225,6 +225,7 @@ function updateTopSessions(data) {
             <td>${fmtTokens(s.total_tokens)}</td>
             <td>$${s.cost.toFixed(2)}</td>
             <td>${fmtDuration(s.duration_minutes)}</td>
+            <td>${fmtDate(s.start_time)}</td>
             <td>$${costPerToken.toFixed(2)}/1M</td>
         </tr>
     `}).join('');
@@ -310,7 +311,7 @@ function updateErrorTable(data) {
     if (countEl) countEl.textContent = `(${entries.length})`;
 
     if (!entries.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">no data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">No data</td></tr>';
         lastStopReasonRows = null;
         lastErrorModelRows = null;
         return;
@@ -329,7 +330,7 @@ function updateErrorTable(data) {
     const models = (data.by_model || []).filter(m => m.errors > 0);
     const modelBody = document.getElementById('errors-by-model-body');
     if (!models.length) {
-        modelBody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">no errors</td></tr>';
+        modelBody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">No errors</td></tr>';
         lastErrorModelRows = null;
         return;
     }
@@ -395,7 +396,7 @@ async function refresh() {
         renderByBreakdown(usage);
         renderToolCounts(tools);
         renderModelEfficiency(usage);
-        renderTokenVelocity(usage);
+        renderTokenVelocity(usage, getGranularity(currentPeriod));
         updateTable(sessions);
         updateTopSessions(sessions);
     } catch (err) {
@@ -577,7 +578,7 @@ document.getElementById('top-sessions-body').addEventListener('click', (e) => {
 
 // Theme selector
 const themeSelect = document.getElementById('theme-select');
-const savedTheme = localStorage.getItem('theme') || 'green';
+const savedTheme = localStorage.getItem('theme') || 'orange';
 if (themeSelect) {
     themeSelect.value = savedTheme;
     document.body.setAttribute('data-theme', savedTheme);

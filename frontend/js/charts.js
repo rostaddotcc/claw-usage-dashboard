@@ -1,42 +1,42 @@
-const COLORS = ['#00ff41', '#00ffff', '#ffaa00', '#ff3333', '#aa55ff', '#4488ff', '#00aa2a', '#ff66aa'];
+const COLORS = ['#d4884a', '#d4a03a', '#c45c6a', '#8b6aae', '#5a8fbf', '#5a9e6f', '#e07a5f', '#c97d5a'];
 
 const CHART_DEFAULTS = {
     chart: {
         background: 'transparent',
-        foreColor: '#00aa2a',
-        fontFamily: "'JetBrains Mono', monospace",
+        foreColor: '#7a6555',
+        fontFamily: "'Inter', -apple-system, sans-serif",
         toolbar: { show: false },
         animations: {
             enabled: true,
             easing: 'easeinout',
-            speed: 800,
+            speed: 600,
         },
     },
     grid: {
-        borderColor: '#1a3a1a',
+        borderColor: '#e6dfd6',
         strokeDashArray: 3,
     },
     tooltip: {
-        theme: 'dark',
+        theme: 'light',
         shared: true,
         intersect: false,
-        style: { fontSize: '12px', fontFamily: "'JetBrains Mono', monospace" },
+        style: { fontSize: '12px', fontFamily: "'Inter', sans-serif" },
         x: { show: true },
     },
     legend: {
         fontSize: '12px',
-        fontFamily: "'JetBrains Mono', monospace",
-        labels: { colors: '#00aa2a' },
-        markers: { radius: 2 },
+        fontFamily: "'Inter', sans-serif",
+        labels: { colors: '#7a6555' },
+        markers: { radius: 3 },
     },
     xaxis: {
-        labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
-        axisBorder: { color: '#1a3a1a' },
-        axisTicks: { color: '#1a3a1a' },
+        labels: { style: { colors: '#7a6555', fontSize: '11px' } },
+        axisBorder: { color: '#e6dfd6' },
+        axisTicks: { color: '#e6dfd6' },
     },
     yaxis: {
         labels: {
-            style: { colors: '#00aa2a', fontSize: '11px' },
+            style: { colors: '#7a6555', fontSize: '11px' },
             formatter: val => formatNumber(val),
         },
     },
@@ -52,7 +52,6 @@ function fmtCost(n) {
     return '$' + n.toFixed(2);
 }
 
-// Store chart instances for cleanup
 const chartInstances = {};
 
 function clearChart(id) {
@@ -61,29 +60,21 @@ function clearChart(id) {
         delete chartInstances[id];
     }
     const el = document.querySelector(id);
-    if (el) el.innerHTML = '<div class="no-data">no data</div>';
+    if (el) el.innerHTML = '<div class="no-data">No data</div>';
 }
 
 function renderChart(id, options) {
-    console.log('renderChart called:', id, 'options:', options);
     if (chartInstances[id]) {
         chartInstances[id].destroy();
     }
     const el = document.querySelector(id);
-    console.log('Element found:', el);
-    if (!el) {
-        console.log('Element not found for:', id);
-        return;
-    }
+    if (!el) return;
     el.innerHTML = '';
     const merged = mergeDeep({}, CHART_DEFAULTS, options);
-    console.log('Merged options:', merged);
-    console.log('ApexCharts available:', typeof ApexCharts !== 'undefined');
     try {
         const chart = new ApexCharts(el, merged);
         chart.render();
         chartInstances[id] = chart;
-        console.log('Chart rendered successfully for:', id);
     } catch (err) {
         console.error('Error rendering chart:', err);
     }
@@ -103,13 +94,11 @@ function mergeDeep(target, ...sources) {
     return target;
 }
 
-// Group small items as "other" — keep top N
 function groupTopN(items, n, labelKey, valueKey) {
     if (items.length <= n) return items;
     const top = items.slice(0, n);
     const rest = items.slice(n);
     const other = { [labelKey]: 'other' };
-    // Sum all numeric fields from rest
     for (const key of Object.keys(rest[0])) {
         if (key === labelKey) continue;
         if (typeof rest[0][key] === 'number') {
@@ -119,8 +108,6 @@ function groupTopN(items, n, labelKey, valueKey) {
     return [...top, other];
 }
 
-// Donut helper — used by provider and agent charts
-// Center labels are disabled — totals are shown in chart titles instead
 const DONUT_DEFAULTS = {
     plotOptions: {
         pie: {
@@ -131,17 +118,15 @@ const DONUT_DEFAULTS = {
         },
     },
     dataLabels: {
-        style: { fontSize: '11px', fontFamily: "'JetBrains Mono', monospace" },
+        style: { fontSize: '11px', fontFamily: "'Inter', sans-serif" },
     },
-    stroke: { width: 1, colors: ['#0a0a0a'] },
+    stroke: { width: 2, colors: ['#ffffff'] },
 };
 
-// --- 1. Token Usage Over Time - split: input+output bars, cache as line ---
 function renderTimeline(data) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-timeline'); return; }
 
     const dates = data.over_time.map(d => d.date);
-
     const totalData = data.over_time.map(d => (d.input || 0) + (d.output || 0) + (d.cache_read || 0));
 
     renderChart('#chart-timeline', {
@@ -152,30 +137,30 @@ function renderTimeline(data) {
             { name: 'output', type: 'bar', data: data.over_time.map(d => d.output) },
             { name: 'cache_read', type: 'line', data: data.over_time.map(d => d.cache_read) },
         ],
-        colors: ['rgba(255,255,255,0.08)', '#00ff41', '#00ffff', '#ffaa00'],
+        colors: ['#e6dfd6', '#d4884a', '#d4a03a', '#5a8fbf'],
         xaxis: {
             categories: dates,
-            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
+            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
         },
         yaxis: [
             {
-                title: { text: 'tokens', style: { color: '#00aa2a', fontSize: '11px' } },
+                title: { text: 'tokens', style: { color: '#7a6555', fontSize: '11px' } },
                 labels: {
-                    style: { colors: '#00aa2a', fontSize: '11px' },
+                    style: { colors: '#7a6555', fontSize: '11px' },
                     formatter: val => formatNumber(val),
                 },
             },
             {
                 opposite: true,
-                title: { text: 'cache_read', style: { color: '#ffaa00', fontSize: '11px' } },
+                title: { text: 'cache_read', style: { color: '#5a8fbf', fontSize: '11px' } },
                 labels: {
-                    style: { colors: '#ffaa00', fontSize: '11px' },
+                    style: { colors: '#5a8fbf', fontSize: '11px' },
                     formatter: val => formatNumber(val),
                 },
             },
         ],
         plotOptions: {
-            bar: { borderRadius: 2, columnWidth: '70%' },
+            bar: { borderRadius: 4, columnWidth: '70%' },
         },
         stroke: { width: [0, 0, 0, 2], curve: 'smooth' },
         tooltip: {
@@ -185,7 +170,6 @@ function renderTimeline(data) {
     });
 }
 
-// --- 2. Cost Over Time - stacked area ---
 function renderCostTimeline(data) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-cost-timeline'); return; }
 
@@ -194,20 +178,20 @@ function renderCostTimeline(data) {
     renderChart('#chart-cost-timeline', {
         chart: { type: 'area', height: 280 },
         series: [{ name: 'cost', data: data.over_time.map(d => Math.round(d.cost * 100) / 100) }],
-        colors: ['#ff3333'],
+        colors: ['#c45c6a'],
         xaxis: {
             categories: dates,
-            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
+            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 formatter: val => fmtCost(val),
             },
         },
         fill: {
             type: 'gradient',
-            gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 100] },
+            gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05, stops: [0, 100] },
         },
         stroke: { width: 2, curve: 'smooth' },
         tooltip: {
@@ -217,7 +201,6 @@ function renderCostTimeline(data) {
     });
 }
 
-// --- 3. Cost by Model - horizontal bar (top 8 + other) ---
 function renderCostByModel(data) {
     if (!data.by_model || !data.by_model.length) { clearChart('#chart-cost-by-model'); return; }
 
@@ -229,20 +212,20 @@ function renderCostByModel(data) {
     renderChart('#chart-cost-by-model', {
         chart: { type: 'bar', height: Math.max(250, models.length * 32) },
         series: [{ name: 'cost', data: costs }],
-        colors: ['#ff3333'],
+        colors: ['#c45c6a'],
         plotOptions: {
-            bar: { horizontal: true, borderRadius: 2, barHeight: '60%' },
+            bar: { horizontal: true, borderRadius: 4, barHeight: '60%' },
         },
         xaxis: {
             categories: models,
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 formatter: val => fmtCost(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 maxWidth: 180,
                 formatter: val => val,
             },
@@ -254,7 +237,6 @@ function renderCostByModel(data) {
     });
 }
 
-// --- 4. Usage by Model - horizontal bar (top 8 + other) ---
 function renderByModel(data) {
     if (!data.by_model || !data.by_model.length) { clearChart('#chart-by-model'); return; }
 
@@ -268,20 +250,20 @@ function renderByModel(data) {
             { name: 'output', data: grouped.map(d => d.output) },
             { name: 'cache_read', data: grouped.map(d => d.cache_read) },
         ],
-        colors: ['#00ff41', '#00ffff', '#ffaa00'],
+        colors: ['#d4884a', '#d4a03a', '#5a8fbf'],
         plotOptions: {
-            bar: { horizontal: true, borderRadius: 2, barHeight: '60%' },
+            bar: { horizontal: true, borderRadius: 4, barHeight: '60%' },
         },
         xaxis: {
             categories: models,
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 formatter: val => formatNumber(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 maxWidth: 180,
                 formatter: val => val,
             },
@@ -293,23 +275,22 @@ function renderByModel(data) {
     });
 }
 
-// Cache Hit Rate - area chart
 function renderCache(data) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-cache'); return; }
 
     renderChart('#chart-cache', {
         chart: { type: 'area', height: 250 },
         series: [{ name: 'cache rate %', data: data.over_time.map(d => d.rate) }],
-        colors: ['#00ffff'],
+        colors: ['#5a9e6f'],
         xaxis: {
             categories: data.over_time.map(d => d.date),
-            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
+            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
         },
         yaxis: {
             min: 0,
             max: 100,
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 formatter: val => val.toFixed(0) + '%',
             },
         },
@@ -317,7 +298,7 @@ function renderCache(data) {
             type: 'gradient',
             gradient: {
                 shadeIntensity: 1,
-                opacityFrom: 0.4,
+                opacityFrom: 0.3,
                 opacityTo: 0.05,
                 stops: [0, 100],
             },
@@ -327,15 +308,15 @@ function renderCache(data) {
         annotations: {
             yaxis: [{
                 y: data.overall_rate,
-                borderColor: '#00aa2a',
+                borderColor: '#5a9e6f',
                 strokeDashArray: 4,
                 label: {
                     text: `avg ${data.overall_rate}%`,
                     style: {
-                        color: '#00ff41',
-                        background: '#0f0f0f',
+                        color: '#5a9e6f',
+                        background: '#ffffff',
                         fontSize: '11px',
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "'Inter', sans-serif",
                     },
                 },
             }],
@@ -343,7 +324,6 @@ function renderCache(data) {
     });
 }
 
-// Stop Reasons - donut
 function renderErrors(data) {
     if (!data.stop_reasons || !Object.keys(data.stop_reasons).length) { clearChart('#chart-errors'); return; }
 
@@ -352,14 +332,14 @@ function renderErrors(data) {
     const total = values.reduce((a, b) => a + b, 0);
 
     const colorMap = {
-        endTurn: '#00ff41', end_turn: '#00ff41', stop: '#00ff41',
-        toolUse: '#00ffff', tool_use: '#00ffff',
-        maxTokens: '#ffaa00', max_tokens: '#ffaa00',
+        endTurn: '#5a9e6f', end_turn: '#5a9e6f', stop: '#5a9e6f',
+        toolUse: '#5a8fbf', tool_use: '#5a8fbf',
+        maxTokens: '#d4a03a', max_tokens: '#d4a03a',
     };
-    const colors = labels.map(l => colorMap[l] || '#ff3333');
+    const colors = labels.map(l => colorMap[l] || '#c45c6a');
 
     const titleEl = document.querySelector('#chart-errors')?.closest('.chart-box')?.querySelector('.chart-title');
-    if (titleEl) titleEl.textContent = `> Stop Reasons (${formatNumber(total)} total)`;
+    if (titleEl) titleEl.textContent = `Stop reasons (${formatNumber(total)} total)`;
 
     renderChart('#chart-errors', {
         chart: { type: 'donut', height: 250 },
@@ -370,7 +350,6 @@ function renderErrors(data) {
     });
 }
 
-// By Provider/Agent - donut with breakdown toggle
 let breakdownMode = 'provider';
 let lastUsageData = null;
 
@@ -391,7 +370,7 @@ function renderByBreakdown(data) {
     if (titleEl) {
         const firstText = titleEl.firstChild;
         if (firstText && firstText.nodeType === Node.TEXT_NODE) {
-            firstText.textContent = `> By ${useProvider ? 'Provider' : 'Agent'} (${totalStr}) `;
+            firstText.textContent = `By ${useProvider ? 'provider' : 'agent'} (${totalStr}) `;
         }
     }
 
@@ -407,7 +386,6 @@ function renderByBreakdown(data) {
     });
 }
 
-// Tool Usage - horizontal bar
 function renderToolCounts(data) {
     if (!data.by_tool || !data.by_tool.length) { clearChart('#chart-tools'); return; }
 
@@ -417,20 +395,20 @@ function renderToolCounts(data) {
     renderChart('#chart-tools', {
         chart: { type: 'bar', height: Math.max(250, tools.length * 28) },
         series: [{ name: 'calls', data: counts }],
-        colors: ['#00ffff'],
+        colors: ['#d4884a'],
         plotOptions: {
-            bar: { horizontal: true, borderRadius: 2, barHeight: '60%' },
+            bar: { horizontal: true, borderRadius: 4, barHeight: '60%' },
         },
         xaxis: {
             categories: tools,
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 formatter: val => formatNumber(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 maxWidth: 160,
                 formatter: val => val,
             },
@@ -439,7 +417,6 @@ function renderToolCounts(data) {
     });
 }
 
-// --- INFRA: CPU & RAM Over Time ---
 function renderCpuRam(data) {
     const series_data = data.cpu_ram_over_time || [];
     if (!series_data.length) { clearChart('#chart-cpu-ram'); return; }
@@ -452,16 +429,16 @@ function renderCpuRam(data) {
             { name: 'CPU %', data: series_data.map(d => d.cpu) },
             { name: 'RAM %', data: series_data.map(d => d.ram) },
         ],
-        colors: ['#00ff41', '#00ffff'],
+        colors: ['#d4884a', '#5a8fbf'],
         xaxis: {
             categories: timestamps,
-            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
+            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
         },
         yaxis: {
             min: 0,
             max: 100,
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 formatter: val => val.toFixed(0) + '%',
             },
         },
@@ -470,7 +447,6 @@ function renderCpuRam(data) {
     });
 }
 
-// --- INFRA: Disk Usage gauge ---
 function renderDiskChart(data) {
     const overview = data.overview;
     if (!overview) { clearChart('#chart-disk'); return; }
@@ -479,21 +455,22 @@ function renderDiskChart(data) {
         chart: { type: 'radialBar', height: 250 },
         series: [overview.disk_pct],
         labels: ['Disk'],
-        colors: [overview.disk_pct >= 90 ? '#ff3333' : overview.disk_pct >= 70 ? '#ffaa00' : '#00ff41'],
+        colors: [overview.disk_pct >= 90 ? '#c45c6a' : overview.disk_pct >= 70 ? '#d4a03a' : '#5a9e6f'],
         plotOptions: {
             radialBar: {
                 hollow: { size: '55%' },
-                track: { background: '#1a3a1a' },
+                track: { background: '#e6dfd6' },
                 dataLabels: {
                     name: {
-                        color: '#00aa2a',
+                        color: '#7a6555',
                         fontSize: '12px',
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "'Inter', sans-serif",
                     },
                     value: {
-                        color: '#00ff41',
+                        color: '#3d2e22',
                         fontSize: '20px',
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "'Inter', sans-serif",
+                        fontWeight: 700,
                         formatter: val => val + '%',
                     },
                 },
@@ -501,12 +478,10 @@ function renderDiskChart(data) {
         },
     });
 
-    // Update title with details
     const titleEl = document.querySelector('#chart-disk')?.closest('.chart-box')?.querySelector('.chart-title');
-    if (titleEl) titleEl.textContent = `> Disk Usage (${overview.disk_used_gb}GB / ${overview.disk_total_gb}GB)`;
+    if (titleEl) titleEl.textContent = `Disk usage (${overview.disk_used_gb}GB / ${overview.disk_total_gb}GB)`;
 }
 
-// --- INFRA: Network I/O ---
 function renderNetworkChart(data) {
     const net = data.network_over_time || [];
     if (net.length < 2) { clearChart('#chart-network'); return; }
@@ -519,14 +494,14 @@ function renderNetworkChart(data) {
             { name: 'sent (MB)', data: net.map(d => d.sent_mb) },
             { name: 'recv (MB)', data: net.map(d => d.recv_mb) },
         ],
-        colors: ['#ff3333', '#00ffff'],
+        colors: ['#c45c6a', '#5a8fbf'],
         xaxis: {
             categories: timestamps,
-            labels: { style: { colors: '#00aa2a', fontSize: '11px' } },
+            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 formatter: val => val.toFixed(1) + ' MB',
             },
         },
@@ -539,7 +514,6 @@ function renderNetworkChart(data) {
     });
 }
 
-// Model Cost Efficiency - scatter plot (cost per token vs usage)
 function renderModelEfficiency(data) {
     if (!data.by_model || !data.by_model.length) { clearChart('#chart-model-efficiency'); return; }
 
@@ -554,22 +528,22 @@ function renderModelEfficiency(data) {
             name: 'Model',
             data: seriesData.map((d, i) => ({ x: d.x, y: parseFloat(d.y.toFixed(4)), z: d.z })),
         }],
-        colors: ['#00ffff'],
+        colors: ['#5a8fbf'],
         xaxis: {
-            labels: { style: { colors: '#00aa2a', fontSize: '10px', rotate: -45 }, trim: true },
+            labels: { style: { colors: '#7a6555', fontSize: '10px', rotate: -45 }, trim: true },
         },
         yaxis: {
             labels: {
-                style: { colors: '#00aa2a', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px' },
                 formatter: val => '$' + val.toFixed(2) + '/1M',
             },
-            title: { text: 'Cost per 1M tokens', style: { color: '#00aa2a', fontSize: '11px' } },
+            title: { text: 'Cost per 1M tokens', style: { color: '#7a6555', fontSize: '11px' } },
         },
         tooltip: {
             shared: false,
             custom: ({ dataPointIndex }) => {
                 const m = data.by_model[dataPointIndex];
-                return `<div class="apexcharts-tooltip-text" style="font-family:'JetBrains Mono',monospace;font-size:11px">
+                return `<div class="apexcharts-tooltip-text" style="font-family:'Inter',sans-serif;font-size:11px">
                     <strong>${m.model}</strong><br/>
                     Tokens: ${m.total.toLocaleString('sv-SE')}<br/>
                     Cost: $${m.cost.toFixed(2)}<br/>
@@ -582,14 +556,15 @@ function renderModelEfficiency(data) {
     });
 }
 
-// Token Velocity - tokens per minute over time
-function renderTokenVelocity(data) {
+function renderTokenVelocity(data, granularity) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-token-velocity'); return; }
 
-    const velocityData = data.over_time.map((d, i, arr) => {
+    const bucketLabels = { minute: 'tok/min', hour: 'tok/h', day: 'tok/day', week: 'tok/week', month: 'tok/mo' };
+    const unit = bucketLabels[granularity] || 'tok/day';
+
+    const velocityData = data.over_time.map(d => {
         const tokens = (d.input || 0) + (d.output || 0) + (d.cache_read || 0);
-        const minutesPerBucket = arr.length > 24 ? 1440 : arr.length > 7 ? 60 : 1;
-        return { date: d.date, velocity: Math.round(tokens / minutesPerBucket) };
+        return { date: d.date, velocity: Math.round(tokens) };
     });
 
     const dates = velocityData.map(d => d.date);
@@ -597,26 +572,26 @@ function renderTokenVelocity(data) {
     const avgVelocity = Math.round(velocities.reduce((a, b) => a + b, 0) / velocities.length);
 
     const titleEl = document.querySelector('#chart-token-velocity')?.closest('.chart-box')?.querySelector('.chart-title');
-    if (titleEl) titleEl.textContent = `> Token Velocity (avg ${formatNumber(avgVelocity)} tok/min)`;
+    if (titleEl) titleEl.textContent = `Token velocity (avg ${formatNumber(avgVelocity)} ${unit})`;
 
     renderChart('#chart-token-velocity', {
         chart: { type: 'area', height: 280 },
-        series: [{ name: 'tokens/min', data: velocities }],
-        colors: ['#00ff41'],
-        xaxis: { categories: dates, labels: { style: { colors: '#00aa2a', fontSize: '11px' } } },
+        series: [{ name: unit, data: velocities }],
+        colors: ['#d4884a'],
+        xaxis: { categories: dates, labels: { style: { colors: '#7a6555', fontSize: '11px' } } },
         yaxis: {
-            labels: { style: { colors: '#00aa2a', fontSize: '11px' }, formatter: val => formatNumber(val) },
-            title: { text: 'tokens/min', style: { color: '#00aa2a', fontSize: '11px' } },
+            labels: { style: { colors: '#7a6555', fontSize: '11px' }, formatter: val => formatNumber(val) },
+            title: { text: unit, style: { color: '#7a6555', fontSize: '11px' } },
         },
-        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 100] } },
+        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05, stops: [0, 100] } },
         stroke: { width: 2, curve: 'smooth' },
         dataLabels: { enabled: false },
         annotations: {
             yaxis: [{
                 y: avgVelocity,
-                borderColor: '#005a15',
+                borderColor: '#d4884a',
                 strokeDashArray: 3,
-                label: { text: `avg ${formatNumber(avgVelocity)}`, style: { color: '#00ff41', background: '#0f0f0f', fontSize: '11px' } },
+                label: { text: `avg ${formatNumber(avgVelocity)}`, style: { color: '#d4884a', background: '#ffffff', fontSize: '11px' } },
             }],
         },
     });

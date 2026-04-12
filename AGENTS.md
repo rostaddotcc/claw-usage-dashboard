@@ -10,15 +10,20 @@
 ## Commands
 
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
 # Run locally (requires OpenClaw data directory)
 DATA_DIR=/path/to/.openclaw uvicorn backend.main:app --port 8090
 
+# Run with auto-reload for development
+DATA_DIR=/path/to/.openclaw uvicorn backend.main:app --port 8090 --reload
+
 # Run with Docker (primary deployment)
 docker compose up -d --build
-
-# Install dependencies
-pip install -r requirements.txt
 ```
+
+Must run from project root — FastAPI mounts `StaticFiles(directory="frontend")`.
 
 ## Architecture
 
@@ -28,7 +33,7 @@ pip install -r requirements.txt
 - `SessionCollector` — Parses `agents/*/sessions/*.jsonl*` (60s cache TTL), includes cron runs as "cron" agent
 - `SystemCollector` — CPU/RAM/disk via `psutil` (10s TTL, rolling history)
 
-**API endpoints (5):** `/api/stats` (overview+cache+errors), `/api/usage`, `/api/sessions`, `/api/tools`, `/api/system`
+**API endpoints (5 routers, 1 endpoint each):** `/api/stats` (overview+cache+errors bundle with ETag), `/api/usage`, `/api/sessions`, `/api/tools`, `/api/system`
 
 **ETag caching:** `/api/stats` returns ETag header, supports If-None-Match for 304 responses
 
@@ -56,15 +61,19 @@ Session files at `$DATA_DIR/agents/<agentId>/sessions/<sessionId>.jsonl*`:
 - Charts only render when tab is visible (ApexCharts needs visible containers)
 - All user data escaped via `esc()` before `innerHTML` (XSS prevention)
 - Language: Swedish (`lang="sv"`, `sv-SE` locale for dates)
-- Three tabs: USAGE (default), INFRA, SESSIONS
+- Three tabs: Usage (default), Infra, Sessions
 - Period filter is a dropdown (not buttons)
 - Sessions table has no pagination (shows all)
-- Theme selector (green/cyan/amber/purple) saves to localStorage
+- Theme selector (orange/amber/rose/sage) saves to localStorage, default is `orange`
 - Click-to-copy session IDs in both sessions tables
-- New charts: Model Cost Efficiency (bubble), Token Velocity (area)
 - Top Sessions table shows 10 most expensive sessions
+- Design: warm light theme with Inter font, soft rounded cards, no terminal aesthetic
 
 ## Known Issues
 
 - Cloudflare Rocket Loader rewrites `<script>` tags — breaks JS execution. Disable for this site.
 - Service name in docker-compose is `molt` (legacy name) — container name is `claw-usage-dashboard`
+
+## CLAUDE.md Drift
+
+`CLAUDE.md` contains outdated references to removed features: `UptimeCollector`, `cron.py` aggregator, uptime/cron tabs, and 9 API endpoints. It also describes a terminal/retro theme that has been replaced with a warm light design. The current codebase has 5 routers, 3 tabs (Usage/Infra/Sessions), and 2 collectors (sessions/system). Trust this file and the source code over CLAUDE.md.
