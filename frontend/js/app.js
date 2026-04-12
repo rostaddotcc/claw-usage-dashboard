@@ -3,9 +3,9 @@ const _params = new URLSearchParams(location.search);
 let currentPeriod = _params.get('period') || 'all';
 let currentModel = _params.get('model') || '';
 let currentAgent = _params.get('agent') || '';
+let currentTab = _params.get('tab') || 'usage';
 let allModels = [];
 let allAgents = [];
-let refreshInterval = null;
 let lastData = {};
 
 function updateURL() {
@@ -13,6 +13,7 @@ function updateURL() {
     if (currentPeriod !== 'all') p.set('period', currentPeriod);
     if (currentModel) p.set('model', currentModel);
     if (currentAgent) p.set('agent', currentAgent);
+    if (currentTab !== 'usage') p.set('tab', currentTab);
     const df = document.getElementById('date-from')?.value;
     const dt = document.getElementById('date-to')?.value;
     if (df) p.set('from', df);
@@ -87,11 +88,45 @@ function updateCards(overview) {
     document.getElementById('card-cost').innerHTML = '$' + overview.total_cost.toFixed(2) + trend(overview.total_cost, p?.total_cost, true);
 }
 
-// Session table sorting & pagination
+// --- Threshold helper for color-coded cards ---
+function thresholdClass(value, yellowAt, redAt) {
+    if (value >= redAt) return 'status-red';
+    if (value >= yellowAt) return 'status-yellow';
+    return 'status-green';
+}
+
+// --- Update system metric cards ---
+function updateSystemCards(data) {
+    const o = data.overview;
+    const cpuEl = document.getElementById('card-cpu');
+    if (cpuEl) {
+        cpuEl.textContent = o.cpu_pct + '%';
+        cpuEl.className = 'card-value ' + thresholdClass(o.cpu_pct, 70, 90);
+    }
+    const diskEl = document.getElementById('card-disk');
+    if (diskEl) {
+        diskEl.textContent = o.disk_pct + '%';
+        diskEl.className = 'card-value ' + thresholdClass(o.disk_pct, 70, 90);
+    }
+}
+
+// --- Tab-specific data fetching ---
+async function refreshTab(tab) {
+    if (tab === 'infra') {
+        try {
+            const system = await API.system();
+            lastData.system = system;
+            updateSystemCards(system);
+            renderCpuRam(system);
+            renderDiskChart(system);
+            renderNetworkChart(system);
+        } catch (err) { console.error('system fetch error:', err); }
+    }
+}
+
+// Session table sorting
 let sessionSort = { key: 'start_time', asc: false };
 let lastSessionData = null;
-let sessionPage = 0;
-const SESSIONS_PER_PAGE = 25;
 
 const SESSION_COLUMNS = [
     { key: 'session_id', type: 'string' },
@@ -125,14 +160,12 @@ function sortSessions(sessions, key, asc) {
 
 function renderTableRows(sessions) {
     const tbody = document.getElementById('sessions-body');
-    const totalPages = Math.ceil(sessions.length / SESSIONS_PER_PAGE);
-    if (sessionPage >= totalPages) sessionPage = Math.max(0, totalPages - 1);
-    const start = sessionPage * SESSIONS_PER_PAGE;
-    const page = sessions.slice(start, start + SESSIONS_PER_PAGE);
+    const countEl = document.getElementById('session-count');
+    if (countEl) countEl.textContent = `(${sessions.length})`;
 
-    tbody.innerHTML = page.map(s => `
+    tbody.innerHTML = sessions.map(s => `
         <tr>
-            <td class="session-id" data-sid="${esc(s.session_id)}" title="${esc(s.session_id)}">${esc(s.session_id.slice(0, 8))}\u2026</td>
+            <td class="session-id" data-sid="${esc(s.session_id_full)}" title="${esc(s.session_id_full)}">${esc(s.session_id)}…</td>
             <td>${esc(s.agent)}</td>
             <td>${esc(s.models_used.join(', '))}</td>
             <td>${fmtTokens(s.total_tokens)}</td>
@@ -143,27 +176,12 @@ function renderTableRows(sessions) {
         </tr>
     `).join('');
 
-    // Update sort indicators
     document.querySelectorAll('#sessions-table th').forEach((th, i) => {
         const col = SESSION_COLUMNS[i];
         th.classList.toggle('sorted', col.key === sessionSort.key);
         th.classList.toggle('asc', col.key === sessionSort.key && sessionSort.asc);
         th.classList.toggle('desc', col.key === sessionSort.key && !sessionSort.asc);
     });
-
-    // Update pagination controls
-    const pag = document.getElementById('session-pagination');
-    if (pag) {
-        if (totalPages <= 1) {
-            pag.style.display = 'none';
-        } else {
-            pag.style.display = 'flex';
-            pag.querySelector('.page-info').textContent =
-                `${start + 1}–${Math.min(start + SESSIONS_PER_PAGE, sessions.length)} of ${sessions.length}`;
-            pag.querySelector('.page-prev').disabled = sessionPage === 0;
-            pag.querySelector('.page-next').disabled = sessionPage >= totalPages - 1;
-        }
-    }
 }
 
 // Update sessions table
@@ -172,17 +190,44 @@ function updateTable(data) {
     if (!data.sessions || !data.sessions.length) {
         tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted)">no sessions found</td></tr>';
         lastSessionData = null;
-        const pag = document.getElementById('session-pagination');
-        if (pag) pag.style.display = 'none';
         return;
     }
 
-    const countEl = document.getElementById('session-count');
-    if (countEl) countEl.textContent = `(${data.sessions.length})`;
+    lastSessionData = sortSessions(data.sessions, sessionSort.key, sessionSort.asc);
+    renderTableRows(lastSessionData);
+}
 
-    sessionPage = 0;
-    lastSessionData = data.sessions;
-    renderTableRows(sortSessions(data.sessions, sessionSort.key, sessionSort.asc));
+// Update Top Sessions table (top 10 by cost)
+function updateTopSessions(data) {
+    const tbody = document.getElementById('top-sessions-body');
+    if (!data.sessions || !data.sessions.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">no sessions found</td></tr>';
+        return;
+    }
+
+    const top10 = [...data.sessions]
+        .filter(s => s.cost != null && s.cost > 0)
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 10);
+
+    if (!top10.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">no cost data available</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = top10.map(s => {
+        const costPerToken = s.total_tokens > 0 ? (s.cost / s.total_tokens) * 1000000 : 0;
+        return `
+        <tr>
+            <td class="session-id" data-sid="${esc(s.session_id_full)}" title="${esc(s.session_id_full)}">${esc(s.session_id)}…</td>
+            <td>${esc(s.agent)}</td>
+            <td>${esc(s.models_used.join(', '))}</td>
+            <td>${fmtTokens(s.total_tokens)}</td>
+            <td>$${s.cost.toFixed(2)}</td>
+            <td>${fmtDuration(s.duration_minutes)}</td>
+            <td>$${costPerToken.toFixed(2)}/1M</td>
+        </tr>
+    `}).join('');
 }
 
 // Stop reasons table — sortable
@@ -321,19 +366,25 @@ async function refresh() {
     if (currentAgent) params.agent = currentAgent;
 
     try {
-        const [overview, usage, cache, errors, sessions, tools] = await Promise.all([
-            API.overview(params),
+        const [stats, usage, sessions, tools, system] = await Promise.all([
+            API.stats(params),
             API.usage(params),
-            API.cache(params),
-            API.errors(params),
             API.sessions(params),
             API.tools(params),
+            API.system().catch(() => null),
         ]);
 
-        lastData = { overview, usage, cache, errors, sessions, tools };
+        const overview = stats?.overview || {};
+        const cache = stats?.cache || {};
+        const errors = stats?.errors || {};
+
+        lastData = { overview, usage, cache, errors, sessions, tools, system };
         updateCards(overview);
         updateAgentFilter(overview);
         updateModelFilter(usage);
+
+        if (system) updateSystemCards(system);
+
         renderTimeline(usage);
         renderCostTimeline(usage);
         renderByModel(usage);
@@ -341,13 +392,12 @@ async function refresh() {
         renderCache(cache);
         renderErrors(errors);
         updateErrorTable(errors);
-        renderByProvider(usage);
-        renderByAgent(usage);
+        renderByBreakdown(usage);
         renderToolCounts(tools);
-        renderCostForecast(usage, currentPeriod);
-        renderToolTimeline(tools);
-        renderDuration(sessions);
+        renderModelEfficiency(usage);
+        renderTokenVelocity(usage);
         updateTable(sessions);
+        updateTopSessions(sessions);
     } catch (err) {
         console.error('fetch error:', err);
     } finally {
@@ -442,45 +492,42 @@ document.getElementById('agent-filter').addEventListener('change', (e) => {
     refresh();
 });
 
-// Session pagination handlers
-document.getElementById('session-pagination').addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn || !lastSessionData) return;
-    if (btn.classList.contains('page-prev') && sessionPage > 0) {
-        sessionPage--;
-    } else if (btn.classList.contains('page-next')) {
-        sessionPage++;
+
+
+// Tab switching handler
+document.getElementById('tab-bar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    const tab = btn.dataset.tab;
+    if (tab === currentTab) return;
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    currentTab = tab;
+    updateURL();
+
+    if (tab === 'sessions') {
+        if (lastData.sessions) updateTable(lastData.sessions);
+    } else if (tab === 'infra') {
+        refreshTab(tab);
     }
-    renderTableRows(sortSessions(lastSessionData, sessionSort.key, sessionSort.asc));
 });
-
-// Provider tokens/cost toggle
-document.getElementById('toggle-provider').addEventListener('click', (e) => {
+// Breakdown toggle (provider/agent)
+document.getElementById('toggle-breakdown').addEventListener('click', (e) => {
     const btn = e.target.closest('button');
     if (!btn || !lastUsageData) return;
-    document.querySelectorAll('#toggle-provider button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#toggle-breakdown button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    providerMode = btn.dataset.mode;
-    renderByProvider(lastUsageData);
+    breakdownMode = btn.dataset.mode;
+    renderByBreakdown(lastUsageData);
 });
 
-// Agent tokens/cost toggle
-document.getElementById('toggle-agent').addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn || !lastUsageData) return;
-    document.querySelectorAll('#toggle-agent button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    agentMode = btn.dataset.mode;
-    renderByAgent(lastUsageData);
-});
-
-// Period filter click handler
-document.getElementById('period-filter').addEventListener('click', (e) => {
-    if (e.target.tagName !== 'BUTTON') return;
-    document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active');
-    currentPeriod = e.target.dataset.period;
-    // Clear custom date range when using period buttons
+// Period filter change handler
+document.getElementById('period-select').addEventListener('change', (e) => {
+    currentPeriod = e.target.value;
     document.getElementById('date-from').value = '';
     document.getElementById('date-to').value = '';
     updateURL();
@@ -512,16 +559,6 @@ document.getElementById('date-clear').addEventListener('click', () => {
     refresh();
 });
 
-// Auto-refresh handler
-document.getElementById('auto-refresh').addEventListener('change', (e) => {
-    if (refreshInterval) clearInterval(refreshInterval);
-    refreshInterval = null;
-    const seconds = parseInt(e.target.value);
-    if (seconds > 0) {
-        refreshInterval = setInterval(refresh, seconds * 1000);
-    }
-});
-
 // Click-to-copy session ID
 document.getElementById('sessions-body').addEventListener('click', (e) => {
     const td = e.target.closest('.session-id');
@@ -530,235 +567,43 @@ document.getElementById('sessions-body').addEventListener('click', (e) => {
     navigator.clipboard.writeText(sid).then(() => showToast('copied: ' + sid));
 });
 
-// --- Export functions ---
-function exportFilename(ext) {
-    const date = new Date().toISOString().slice(0, 10);
-    return `claw-${currentPeriod}-${date}.${ext}`;
-}
-
-function downloadFile(content, filename, type) {
-    const blob = new Blob([content], { type });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-}
-
-function csvVal(v) {
-    const s = String(v ?? '');
-    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function exportFilterLabel() {
-    const parts = [`Period: ${currentPeriod.toUpperCase()}`];
-    parts.push(`Agent: ${currentAgent || 'ALL'}`);
-    parts.push(`Model: ${currentModel || 'ALL'}`);
-    return parts.join(', ');
-}
-
-function exportCSV() {
-    if (!lastData.overview) return;
-    const o = lastData.overview;
-    const lines = [];
-
-    lines.push('# ' + exportFilterLabel());
-    lines.push('');
-    lines.push('Metric,Value');
-    lines.push(`Total Tokens,${o.total_tokens}`);
-    lines.push(`Total Messages,${o.total_messages}`);
-    lines.push(`Total Sessions,${o.total_sessions}`);
-    lines.push(`Cache Hit Rate (%),${o.cache_hit_rate}`);
-    lines.push(`Error Rate (%),${o.error_rate}`);
-    lines.push(`Total Cost ($),${o.total_cost.toFixed(2)}`);
-    lines.push('');
-
-    const sessions = lastData.sessions?.sessions || [];
-    if (sessions.length) {
-        lines.push('Session ID,Agent,Models,Tokens,Messages,Cost,Duration (min),Start Time');
-        for (const s of sessions) {
-            lines.push([
-                csvVal(s.session_id), csvVal(s.agent),
-                csvVal((s.models_used || []).join('; ')),
-                s.total_tokens, s.message_count,
-                s.cost != null ? s.cost.toFixed(2) : '',
-                s.duration_minutes != null ? Math.round(s.duration_minutes) : '',
-                s.start_time || '',
-            ].join(','));
-        }
-        lines.push('');
-    }
-
-    const byModel = lastData.usage?.by_model || [];
-    if (byModel.length) {
-        lines.push('Model,Input,Output,Cache Read,Total,Cost');
-        for (const m of byModel) {
-            lines.push([csvVal(m.model), m.input, m.output, m.cache_read, m.total,
-                m.cost != null ? m.cost.toFixed(2) : ''].join(','));
-        }
-        lines.push('');
-    }
-
-    const byTool = lastData.tools?.by_tool || [];
-    if (byTool.length) {
-        lines.push('Tool,Count');
-        for (const t of byTool) lines.push(`${csvVal(t.tool)},${t.count}`);
-    }
-
-    downloadFile('\uFEFF' + lines.join('\n'), exportFilename('csv'), 'text/csv;charset=utf-8');
-    showToast('exported ' + exportFilename('csv'));
-}
-
-function exportMD() {
-    if (!lastData.overview) return;
-    const o = lastData.overview;
-    const lines = [];
-
-    lines.push('# Claw Usage Dashboard Export');
-    lines.push('');
-    lines.push(`**${exportFilterLabel()}**`);
-    lines.push('');
-    lines.push('## Summary');
-    lines.push('');
-    lines.push('| Metric | Value |');
-    lines.push('|--------|-------|');
-    lines.push(`| Total Tokens | ${fmtTokens(o.total_tokens)} |`);
-    lines.push(`| Total Messages | ${fmtCount(o.total_messages)} |`);
-    lines.push(`| Total Sessions | ${fmtCount(o.total_sessions)} |`);
-    lines.push(`| Cache Hit Rate | ${o.cache_hit_rate}% |`);
-    lines.push(`| Error Rate | ${o.error_rate}% |`);
-    lines.push(`| Total Cost | $${o.total_cost.toFixed(2)} |`);
-    lines.push('');
-
-    const byModel = lastData.usage?.by_model || [];
-    if (byModel.length) {
-        lines.push('## Usage by Model');
-        lines.push('');
-        lines.push('| Model | Input | Output | Cache Read | Total | Cost |');
-        lines.push('|-------|-------|--------|------------|-------|------|');
-        for (const m of byModel) {
-            lines.push(`| ${m.model} | ${fmtTokens(m.input)} | ${fmtTokens(m.output)} | ${fmtTokens(m.cache_read)} | ${fmtTokens(m.total)} | ${m.cost != null ? '$' + m.cost.toFixed(2) : '--'} |`);
-        }
-        lines.push('');
-    }
-
-    const byTool = lastData.tools?.by_tool || [];
-    if (byTool.length) {
-        lines.push('## Tool Usage');
-        lines.push('');
-        lines.push('| Tool | Count |');
-        lines.push('|------|-------|');
-        for (const t of byTool) lines.push(`| ${t.tool} | ${fmtCount(t.count)} |`);
-        lines.push('');
-    }
-
-    const sessions = lastData.sessions?.sessions || [];
-    if (sessions.length) {
-        lines.push('## Sessions');
-        lines.push('');
-        lines.push('| ID | Agent | Model | Tokens | Msgs | Cost | Duration | Time |');
-        lines.push('|----|-------|-------|--------|------|------|----------|------|');
-        for (const s of sessions) {
-            lines.push(`| ${s.session_id.slice(0, 8)}… | ${s.agent} | ${(s.models_used || []).join(', ')} | ${fmtTokens(s.total_tokens)} | ${s.message_count} | ${s.cost != null ? '$' + s.cost.toFixed(2) : '--'} | ${fmtDuration(s.duration_minutes)} | ${fmtDate(s.start_time)} |`);
-        }
-    }
-
-    downloadFile(lines.join('\n'), exportFilename('md'), 'text/markdown;charset=utf-8');
-    showToast('exported ' + exportFilename('md'));
-}
-
-function exportXLSX() {
-    if (!lastData.overview || typeof XLSX === 'undefined') {
-        showToast('XLSX library not loaded');
-        return;
-    }
-    const o = lastData.overview;
-    const wb = XLSX.utils.book_new();
-
-    // Summary sheet
-    const summary = [
-        ['Claw Usage Dashboard Export'],
-        [exportFilterLabel()],
-        [],
-        ['Metric', 'Value'],
-        ['Total Tokens', o.total_tokens],
-        ['Total Messages', o.total_messages],
-        ['Total Sessions', o.total_sessions],
-        ['Cache Hit Rate (%)', o.cache_hit_rate],
-        ['Error Rate (%)', o.error_rate],
-        ['Total Cost ($)', o.total_cost],
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
-
-    // Sessions sheet
-    const sessions = lastData.sessions?.sessions || [];
-    if (sessions.length) {
-        const rows = [['Session ID', 'Agent', 'Models', 'Tokens', 'Messages', 'Cost ($)', 'Duration (min)', 'Start Time']];
-        for (const s of sessions) {
-            rows.push([
-                s.session_id, s.agent, (s.models_used || []).join(', '),
-                s.total_tokens, s.message_count, s.cost ?? '',
-                s.duration_minutes != null ? Math.round(s.duration_minutes) : '',
-                s.start_time || '',
-            ]);
-        }
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Sessions');
-    }
-
-    // Usage by Model sheet
-    const byModel = lastData.usage?.by_model || [];
-    if (byModel.length) {
-        const rows = [['Model', 'Input', 'Output', 'Cache Read', 'Total', 'Cost ($)']];
-        for (const m of byModel) rows.push([m.model, m.input, m.output, m.cache_read, m.total, m.cost ?? '']);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Model');
-    }
-
-    // By Provider sheet
-    const byProvider = lastData.usage?.by_provider || [];
-    if (byProvider.length) {
-        const rows = [['Provider', 'Total Tokens', 'Cost ($)']];
-        for (const p of byProvider) rows.push([p.provider, p.total, p.cost ?? '']);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Provider');
-    }
-
-    // By Agent sheet
-    const byAgent = lastData.usage?.by_agent || [];
-    if (byAgent.length) {
-        const rows = [['Agent', 'Total Tokens', 'Cost ($)']];
-        for (const a of byAgent) rows.push([a.agent, a.total, a.cost ?? '']);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'By Agent');
-    }
-
-    // Tool Usage sheet
-    const byTool = lastData.tools?.by_tool || [];
-    if (byTool.length) {
-        const rows = [['Tool', 'Count']];
-        for (const t of byTool) rows.push([t.tool, t.count]);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Tools');
-    }
-
-    XLSX.writeFile(wb, exportFilename('xlsx'));
-    showToast('exported ' + exportFilename('xlsx'));
-}
-
-// Export button handlers
-document.getElementById('export-csv').addEventListener('click', exportCSV);
-document.getElementById('export-md').addEventListener('click', exportMD);
-document.getElementById('export-xlsx').addEventListener('click', exportXLSX);
-
-// Restore active period button and date range from URL
-document.querySelectorAll('.period-filter button').forEach(b => {
-    b.classList.toggle('active', b.dataset.period === currentPeriod);
+// Click-to-copy top sessions ID
+document.getElementById('top-sessions-body').addEventListener('click', (e) => {
+    const td = e.target.closest('.session-id');
+    if (!td) return;
+    const sid = td.dataset.sid;
+    navigator.clipboard.writeText(sid).then(() => showToast('copied: ' + sid));
 });
+
+// Theme selector
+const themeSelect = document.getElementById('theme-select');
+const savedTheme = localStorage.getItem('theme') || 'green';
+if (themeSelect) {
+    themeSelect.value = savedTheme;
+    document.body.setAttribute('data-theme', savedTheme);
+    themeSelect.addEventListener('change', (e) => {
+        const theme = e.target.value;
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    });
+}
+
+// Restore filters from URL
 const _fromParam = _params.get('from');
 const _toParam = _params.get('to');
 if (_fromParam) document.getElementById('date-from').value = _fromParam;
 if (_toParam) document.getElementById('date-to').value = _toParam;
-if (_fromParam || _toParam) {
-    document.querySelectorAll('.period-filter button').forEach(b => b.classList.remove('active'));
+
+// Set period dropdown
+const periodSelect = document.getElementById('period-select');
+if (periodSelect) periodSelect.value = currentPeriod;
+
+// Restore active tab from URL
+if (currentTab !== 'usage') {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === currentTab));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const tabEl = document.getElementById('tab-' + currentTab);
+    if (tabEl) tabEl.classList.add('active');
 }
 
 // Initial load

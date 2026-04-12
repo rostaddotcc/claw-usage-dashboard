@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 
-from backend.routers import overview, usage, cache, errors, sessions, tools
+from backend.routers import stats, usage, sessions, tools, system
 
-app = FastAPI(title="Claw Usage Dashboard", version="1.0.0")
+app = FastAPI(title="Claw Usage Dashboard", version="1.5.0")
 
 
 @app.middleware("http")
@@ -15,11 +15,10 @@ async def no_cache_static(request, call_next):
     return response
 
 
-app.include_router(overview.router, prefix="/api")
+app.include_router(stats.router, prefix="/api")
 app.include_router(usage.router, prefix="/api")
-app.include_router(cache.router, prefix="/api")
-app.include_router(errors.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(tools.router, prefix="/api")
+app.include_router(system.router, prefix="/api")
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

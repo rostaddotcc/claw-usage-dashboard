@@ -6,6 +6,7 @@ from typing import Any
 
 from backend.collectors.base import BaseCollector
 from backend.config import DATA_DIR, AGENTS_SUBDIR, CACHE_TTL_SECONDS
+from backend.pricing import calculate_cost
 
 
 class SessionCollector(BaseCollector):
@@ -122,6 +123,11 @@ class SessionCollector(BaseCollector):
         cache_write = usage.get("cacheWrite", 0) or usage.get("cache_write", 0) or usage.get("cache_creation_input_tokens", 0)
         total = usage.get("totalTokens", 0) or (input_t + output_t + cache_read + cache_write)
         cost = usage.get("cost", {})
+        model_id = msg.get("model") or entry.get("model", "unknown")
+
+        # Calculate fallback cost if not provided by OpenClaw
+        if cost.get("total", 0) == 0 and (input_t > 0 or output_t > 0):
+            cost = calculate_cost(model_id, input_t, output_t, cache_read, cache_write)
 
         tools = []
         content = msg.get("content") or entry.get("content") or []
@@ -135,7 +141,7 @@ class SessionCollector(BaseCollector):
             "session_id": session_id,
             "timestamp": ts,
             "provider": msg.get("provider") or entry.get("provider", "unknown"),
-            "model": msg.get("model") or entry.get("model", "unknown"),
+            "model": model_id,
             "api": msg.get("api", ""),
             "stop_reason": msg.get("stopReason") or entry.get("stop_reason", "unknown"),
             "role": msg.get("role", ""),
@@ -146,8 +152,8 @@ class SessionCollector(BaseCollector):
             "total_tokens": total,
             "cost_input": cost.get("input", 0),
             "cost_output": cost.get("output", 0),
-            "cost_cache_read": cost.get("cacheRead", 0) or cost.get("cache_read", 0),
-            "cost_cache_write": cost.get("cacheWrite", 0) or cost.get("cache_write", 0),
+            "cost_cache_read": cost.get("cache_read", 0),
+            "cost_cache_write": cost.get("cache_write", 0),
             "cost_total": cost.get("total", 0),
             "tools": tools,
         }
@@ -173,6 +179,16 @@ class SessionCollector(BaseCollector):
             return None
 
         cost = usage.get("cost", {})
+        model_id = msg.get("model", "unknown")
+
+        # Calculate fallback cost if not provided by OpenClaw
+        if cost.get("total", 0) == 0:
+            input_t = usage.get("input", 0)
+            output_t = usage.get("output", 0)
+            cache_read = usage.get("cacheRead", 0)
+            cache_write = usage.get("cacheWrite", 0)
+            if input_t > 0 or output_t > 0:
+                cost = calculate_cost(model_id, input_t, output_t, cache_read, cache_write)
 
         tools = []
         # content may be in msg (nested format) or entry (flat format)
@@ -187,7 +203,7 @@ class SessionCollector(BaseCollector):
             "session_id": session_id,
             "timestamp": ts,
             "provider": msg.get("provider", "unknown"),
-            "model": msg.get("model", "unknown"),
+            "model": model_id,
             "api": msg.get("api", ""),
             "stop_reason": msg.get("stopReason", "unknown"),
             "role": msg.get("role", ""),
@@ -198,8 +214,8 @@ class SessionCollector(BaseCollector):
             "total_tokens": usage.get("totalTokens", 0),
             "cost_input": cost.get("input", 0),
             "cost_output": cost.get("output", 0),
-            "cost_cache_read": cost.get("cacheRead", 0),
-            "cost_cache_write": cost.get("cacheWrite", 0),
+            "cost_cache_read": cost.get("cache_read", 0),
+            "cost_cache_write": cost.get("cache_write", 0),
             "cost_total": cost.get("total", 0),
             "tools": tools,
         }
