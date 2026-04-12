@@ -3,18 +3,19 @@ const COLORS = ['#d4884a', '#d4a03a', '#c45c6a', '#8b6aae', '#5a8fbf', '#5a9e6f'
 const CHART_DEFAULTS = {
     chart: {
         background: 'transparent',
-        foreColor: '#7a6555',
+        foreColor: '#a89585',
         fontFamily: "'Inter', -apple-system, sans-serif",
         toolbar: { show: false },
         animations: {
             enabled: true,
             easing: 'easeinout',
-            speed: 600,
+            speed: 500,
         },
     },
     grid: {
-        borderColor: '#e6dfd6',
-        strokeDashArray: 3,
+        borderColor: 'rgba(230, 223, 214, 0.5)',
+        strokeDashArray: 0,
+        xaxis: { lines: { show: false } },
     },
     tooltip: {
         theme: 'light',
@@ -24,19 +25,20 @@ const CHART_DEFAULTS = {
         x: { show: true },
     },
     legend: {
-        fontSize: '12px',
+        fontSize: '11px',
         fontFamily: "'Inter', sans-serif",
-        labels: { colors: '#7a6555' },
-        markers: { radius: 3 },
+        labels: { colors: '#a89585' },
+        markers: { radius: 3, width: 10, height: 10 },
+        itemMargin: { horizontal: 8 },
     },
     xaxis: {
-        labels: { style: { colors: '#7a6555', fontSize: '11px' } },
-        axisBorder: { color: '#e6dfd6' },
-        axisTicks: { color: '#e6dfd6' },
+        labels: { style: { colors: '#a89585', fontSize: '11px' } },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
     },
     yaxis: {
         labels: {
-            style: { colors: '#7a6555', fontSize: '11px' },
+            style: { colors: '#a89585', fontSize: '11px' },
             formatter: val => formatNumber(val),
         },
     },
@@ -112,57 +114,53 @@ const DONUT_DEFAULTS = {
     plotOptions: {
         pie: {
             donut: {
-                size: '55%',
-                labels: { show: false },
+                size: '65%',
+                labels: {
+                    show: true,
+                    total: {
+                        show: true,
+                        label: 'Total',
+                        fontSize: '11px',
+                        fontFamily: "'Inter', sans-serif",
+                        color: '#a89585',
+                        formatter: w => formatNumber(w.globals.seriesTotals.reduce((a, b) => a + b, 0)),
+                    },
+                },
             },
         },
     },
-    dataLabels: {
-        style: { fontSize: '11px', fontFamily: "'Inter', sans-serif" },
-    },
-    stroke: { width: 2, colors: ['#ffffff'] },
+    dataLabels: { enabled: false },
+    stroke: { width: 3, colors: ['#ffffff'] },
 };
 
 function renderTimeline(data) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-timeline'); return; }
 
     const dates = data.over_time.map(d => d.date);
-    const totalData = data.over_time.map(d => (d.input || 0) + (d.output || 0) + (d.cache_read || 0));
 
     renderChart('#chart-timeline', {
-        chart: { type: 'line', height: 280 },
+        chart: { type: 'area', stacked: true, height: 280 },
         series: [
-            { name: 'total', type: 'bar', data: totalData },
-            { name: 'input', type: 'bar', data: data.over_time.map(d => d.input) },
-            { name: 'output', type: 'bar', data: data.over_time.map(d => d.output) },
-            { name: 'cache_read', type: 'line', data: data.over_time.map(d => d.cache_read) },
+            { name: 'input', data: data.over_time.map(d => d.input || 0) },
+            { name: 'output', data: data.over_time.map(d => d.output || 0) },
+            { name: 'cache_read', data: data.over_time.map(d => d.cache_read || 0) },
         ],
-        colors: ['#e6dfd6', '#d4884a', '#d4a03a', '#5a8fbf'],
+        colors: ['#d4884a', '#d4a03a', '#5a8fbf'],
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.6, opacityTo: 0.15, stops: [0, 100] },
+        },
+        stroke: { width: 0 },
         xaxis: {
             categories: dates,
-            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
+            labels: { style: { colors: '#a89585', fontSize: '10px' } },
         },
-        yaxis: [
-            {
-                title: { text: 'tokens', style: { color: '#7a6555', fontSize: '11px' } },
-                labels: {
-                    style: { colors: '#7a6555', fontSize: '11px' },
-                    formatter: val => formatNumber(val),
-                },
+        yaxis: {
+            labels: {
+                style: { colors: '#a89585', fontSize: '11px' },
+                formatter: val => formatNumber(val),
             },
-            {
-                opposite: true,
-                title: { text: 'cache_read', style: { color: '#5a8fbf', fontSize: '11px' } },
-                labels: {
-                    style: { colors: '#5a8fbf', fontSize: '11px' },
-                    formatter: val => formatNumber(val),
-                },
-            },
-        ],
-        plotOptions: {
-            bar: { borderRadius: 4, columnWidth: '70%' },
         },
-        stroke: { width: [0, 0, 0, 2], curve: 'smooth' },
         tooltip: {
             y: { formatter: val => val.toLocaleString('sv-SE') + ' tokens' },
         },
@@ -174,26 +172,31 @@ function renderCostTimeline(data) {
     if (!data.over_time || !data.over_time.length) { clearChart('#chart-cost-timeline'); return; }
 
     const dates = data.over_time.map(d => d.date);
+    const costData = data.over_time.map(d => Math.round(d.cost * 100) / 100);
 
     renderChart('#chart-cost-timeline', {
         chart: { type: 'area', height: 280 },
-        series: [{ name: 'cost', data: data.over_time.map(d => Math.round(d.cost * 100) / 100) }],
+        series: [{ name: 'cost', data: costData }],
         colors: ['#c45c6a'],
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 100] },
+        },
+        stroke: { width: 2.5, curve: 'smooth' },
+        markers: {
+            size: 0,
+            hover: { size: 5 },
+        },
         xaxis: {
             categories: dates,
-            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
+            labels: { style: { colors: '#a89585', fontSize: '10px' } },
         },
         yaxis: {
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#a89585', fontSize: '11px' },
                 formatter: val => fmtCost(val),
             },
         },
-        fill: {
-            type: 'gradient',
-            gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05, stops: [0, 100] },
-        },
-        stroke: { width: 2, curve: 'smooth' },
         tooltip: {
             y: { formatter: val => fmtCost(val) },
         },
@@ -210,24 +213,34 @@ function renderCostByModel(data) {
     const costs = grouped.map(d => Math.round(d.cost * 100) / 100);
 
     renderChart('#chart-cost-by-model', {
-        chart: { type: 'bar', height: Math.max(250, models.length * 32) },
+        chart: { type: 'bar', height: Math.max(220, models.length * 36) },
         series: [{ name: 'cost', data: costs }],
-        colors: ['#c45c6a'],
+        colors: [{
+            type: 'gradient',
+            gradient: { shadeFrom: 'light', shadeTo: 'dark', stops: [0, 100], colorStops: [
+                { offset: 0, color: '#e8a0a0', opacity: 1 },
+                { offset: 100, color: '#c45c6a', opacity: 1 },
+            ]},
+        }],
         plotOptions: {
-            bar: { horizontal: true, borderRadius: 4, barHeight: '60%' },
+            bar: {
+                horizontal: true,
+                borderRadius: 6,
+                barHeight: '55%',
+                distributed: false,
+            },
         },
         xaxis: {
             categories: models,
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#a89585', fontSize: '11px' },
                 formatter: val => fmtCost(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px', fontWeight: 500 },
                 maxWidth: 180,
-                formatter: val => val,
             },
         },
         tooltip: {
@@ -244,7 +257,7 @@ function renderByModel(data) {
     const models = grouped.map(d => d.model);
 
     renderChart('#chart-by-model', {
-        chart: { type: 'bar', height: Math.max(250, models.length * 32) },
+        chart: { type: 'bar', stacked: true, height: Math.max(220, models.length * 36) },
         series: [
             { name: 'input', data: grouped.map(d => d.input) },
             { name: 'output', data: grouped.map(d => d.output) },
@@ -252,20 +265,27 @@ function renderByModel(data) {
         ],
         colors: ['#d4884a', '#d4a03a', '#5a8fbf'],
         plotOptions: {
-            bar: { horizontal: true, borderRadius: 4, barHeight: '60%' },
+            bar: {
+                horizontal: true,
+                borderRadius: 6,
+                barHeight: '55%',
+            },
+        },
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.3, stops: [0, 100] },
         },
         xaxis: {
             categories: models,
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#a89585', fontSize: '11px' },
                 formatter: val => formatNumber(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px', fontWeight: 500 },
                 maxWidth: 180,
-                formatter: val => val,
             },
         },
         tooltip: {
@@ -282,41 +302,39 @@ function renderCache(data) {
         chart: { type: 'area', height: 250 },
         series: [{ name: 'cache rate %', data: data.over_time.map(d => d.rate) }],
         colors: ['#5a9e6f'],
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 100] },
+        },
+        stroke: { width: 2.5, curve: 'smooth' },
+        markers: { size: 0, hover: { size: 5 } },
         xaxis: {
             categories: data.over_time.map(d => d.date),
-            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
+            labels: { style: { colors: '#a89585', fontSize: '10px' } },
         },
         yaxis: {
             min: 0,
             max: 100,
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#a89585', fontSize: '11px' },
                 formatter: val => val.toFixed(0) + '%',
             },
         },
-        fill: {
-            type: 'gradient',
-            gradient: {
-                shadeIntensity: 1,
-                opacityFrom: 0.3,
-                opacityTo: 0.05,
-                stops: [0, 100],
-            },
-        },
-        stroke: { width: 2 },
         dataLabels: { enabled: false },
         annotations: {
             yaxis: [{
                 y: data.overall_rate,
                 borderColor: '#5a9e6f',
                 strokeDashArray: 4,
+                strokeOpacity: 0.5,
                 label: {
                     text: `avg ${data.overall_rate}%`,
                     style: {
                         color: '#5a9e6f',
                         background: '#ffffff',
-                        fontSize: '11px',
+                        fontSize: '10px',
                         fontFamily: "'Inter', sans-serif",
+                        fontWeight: 600,
                     },
                 },
             }],
@@ -363,14 +381,12 @@ function renderByBreakdown(data) {
 
     const values = sourceData.map(d => d.total);
     const labels = sourceData.map(d => d[labelKey]);
-    const total = values.reduce((a, b) => a + b, 0);
-    const totalStr = formatNumber(total) + ' tokens';
 
     const titleEl = document.querySelector('#chart-by-breakdown')?.closest('.chart-box')?.querySelector('.chart-title');
     if (titleEl) {
         const firstText = titleEl.firstChild;
         if (firstText && firstText.nodeType === Node.TEXT_NODE) {
-            firstText.textContent = `By ${useProvider ? 'provider' : 'agent'} (${totalStr}) `;
+            firstText.textContent = `By ${useProvider ? 'provider' : 'agent'} `;
         }
     }
 
@@ -393,24 +409,33 @@ function renderToolCounts(data) {
     const counts = data.by_tool.map(d => d.count);
 
     renderChart('#chart-tools', {
-        chart: { type: 'bar', height: Math.max(250, tools.length * 28) },
+        chart: { type: 'bar', height: Math.max(220, tools.length * 32) },
         series: [{ name: 'calls', data: counts }],
-        colors: ['#d4884a'],
+        colors: [{
+            type: 'gradient',
+            gradient: { shadeFrom: 'light', shadeTo: 'dark', stops: [0, 100], colorStops: [
+                { offset: 0, color: '#e8c0a0', opacity: 1 },
+                { offset: 100, color: '#d4884a', opacity: 1 },
+            ]},
+        }],
         plotOptions: {
-            bar: { horizontal: true, borderRadius: 4, barHeight: '60%' },
+            bar: {
+                horizontal: true,
+                borderRadius: 6,
+                barHeight: '55%',
+            },
         },
         xaxis: {
             categories: tools,
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#a89585', fontSize: '11px' },
                 formatter: val => formatNumber(val),
             },
         },
         yaxis: {
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#7a6555', fontSize: '11px', fontWeight: 500 },
                 maxWidth: 160,
-                formatter: val => val,
             },
         },
         dataLabels: { enabled: false },
@@ -424,25 +449,30 @@ function renderCpuRam(data) {
     const timestamps = series_data.map(d => d.timestamp.slice(11, 19));
 
     renderChart('#chart-cpu-ram', {
-        chart: { type: 'line', height: 280 },
+        chart: { type: 'area', height: 280 },
         series: [
-            { name: 'CPU %', data: series_data.map(d => d.cpu) },
-            { name: 'RAM %', data: series_data.map(d => d.ram) },
+            { name: 'CPU', data: series_data.map(d => d.cpu) },
+            { name: 'RAM', data: series_data.map(d => d.ram) },
         ],
         colors: ['#d4884a', '#5a8fbf'],
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.02, stops: [0, 100] },
+        },
+        stroke: { width: 2, curve: 'smooth' },
+        markers: { size: 0, hover: { size: 4 } },
         xaxis: {
             categories: timestamps,
-            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
+            labels: { style: { colors: '#a89585', fontSize: '10px' } },
         },
         yaxis: {
             min: 0,
             max: 100,
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#a89585', fontSize: '11px' },
                 formatter: val => val.toFixed(0) + '%',
             },
         },
-        stroke: { width: 2, curve: 'smooth' },
         dataLabels: { enabled: false },
     });
 }
@@ -451,24 +481,26 @@ function renderDiskChart(data) {
     const overview = data.overview;
     if (!overview) { clearChart('#chart-disk'); return; }
 
+    const diskColor = overview.disk_pct >= 90 ? '#c45c6a' : overview.disk_pct >= 70 ? '#d4a03a' : '#5a9e6f';
+
     renderChart('#chart-disk', {
         chart: { type: 'radialBar', height: 250 },
         series: [overview.disk_pct],
         labels: ['Disk'],
-        colors: [overview.disk_pct >= 90 ? '#c45c6a' : overview.disk_pct >= 70 ? '#d4a03a' : '#5a9e6f'],
+        colors: [diskColor],
         plotOptions: {
             radialBar: {
-                hollow: { size: '55%' },
-                track: { background: '#e6dfd6' },
+                hollow: { size: '60%' },
+                track: { background: '#e6dfd6', borderRadius: 12 },
                 dataLabels: {
                     name: {
-                        color: '#7a6555',
+                        color: '#a89585',
                         fontSize: '12px',
                         fontFamily: "'Inter', sans-serif",
                     },
                     value: {
                         color: '#3d2e22',
-                        fontSize: '20px',
+                        fontSize: '22px',
                         fontFamily: "'Inter', sans-serif",
                         fontWeight: 700,
                         formatter: val => val + '%',
@@ -491,25 +523,26 @@ function renderNetworkChart(data) {
     renderChart('#chart-network', {
         chart: { type: 'area', height: 250 },
         series: [
-            { name: 'sent (MB)', data: net.map(d => d.sent_mb) },
-            { name: 'recv (MB)', data: net.map(d => d.recv_mb) },
+            { name: 'sent', data: net.map(d => d.sent_mb) },
+            { name: 'recv', data: net.map(d => d.recv_mb) },
         ],
         colors: ['#c45c6a', '#5a8fbf'],
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.02, stops: [0, 100] },
+        },
+        stroke: { width: 2, curve: 'smooth' },
+        markers: { size: 0, hover: { size: 4 } },
         xaxis: {
             categories: timestamps,
-            labels: { style: { colors: '#7a6555', fontSize: '11px' } },
+            labels: { style: { colors: '#a89585', fontSize: '10px' } },
         },
         yaxis: {
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
+                style: { colors: '#a89585', fontSize: '11px' },
                 formatter: val => val.toFixed(1) + ' MB',
             },
         },
-        fill: {
-            type: 'gradient',
-            gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05, stops: [0, 100] },
-        },
-        stroke: { width: 2, curve: 'smooth' },
         dataLabels: { enabled: false },
     });
 }
@@ -517,42 +550,61 @@ function renderNetworkChart(data) {
 function renderModelEfficiency(data) {
     if (!data.by_model || !data.by_model.length) { clearChart('#chart-model-efficiency'); return; }
 
-    const seriesData = data.by_model.map(m => {
-        const costPerToken = m.total > 0 ? (m.cost / m.total) * 1000000 : 0;
-        return { x: m.model, y: costPerToken, z: m.total };
-    });
+    const sorted = [...data.by_model]
+        .map(m => ({
+            model: m.model,
+            costPer1M: m.total > 0 ? (m.cost / m.total) * 1000000 : 0,
+            total: m.total,
+            cost: m.cost,
+        }))
+        .sort((a, b) => b.costPer1M - a.costPer1M);
+
+    const models = sorted.map(m => m.model);
+    const costs = sorted.map(m => parseFloat(m.costPer1M.toFixed(2)));
 
     renderChart('#chart-model-efficiency', {
-        chart: { type: 'bubble', height: 280 },
-        series: [{
-            name: 'Model',
-            data: seriesData.map((d, i) => ({ x: d.x, y: parseFloat(d.y.toFixed(4)), z: d.z })),
+        chart: { type: 'bar', height: Math.max(220, models.length * 36) },
+        series: [{ name: '$/1M tokens', data: costs }],
+        colors: [{
+            type: 'gradient',
+            gradient: { shadeFrom: 'light', shadeTo: 'dark', stops: [0, 100], colorStops: [
+                { offset: 0, color: '#a0c0e8', opacity: 1 },
+                { offset: 100, color: '#5a8fbf', opacity: 1 },
+            ]},
         }],
-        colors: ['#5a8fbf'],
+        plotOptions: {
+            bar: {
+                horizontal: true,
+                borderRadius: 6,
+                barHeight: '55%',
+            },
+        },
         xaxis: {
-            labels: { style: { colors: '#7a6555', fontSize: '10px', rotate: -45 }, trim: true },
+            categories: models,
+            labels: {
+                style: { colors: '#a89585', fontSize: '11px' },
+                formatter: val => '$' + val.toFixed(2),
+            },
         },
         yaxis: {
             labels: {
-                style: { colors: '#7a6555', fontSize: '11px' },
-                formatter: val => '$' + val.toFixed(2) + '/1M',
+                style: { colors: '#7a6555', fontSize: '11px', fontWeight: 500 },
+                maxWidth: 180,
             },
-            title: { text: 'Cost per 1M tokens', style: { color: '#7a6555', fontSize: '11px' } },
         },
         tooltip: {
             shared: false,
             custom: ({ dataPointIndex }) => {
-                const m = data.by_model[dataPointIndex];
+                const m = sorted[dataPointIndex];
                 return `<div class="apexcharts-tooltip-text" style="font-family:'Inter',sans-serif;font-size:11px">
                     <strong>${m.model}</strong><br/>
                     Tokens: ${m.total.toLocaleString('sv-SE')}<br/>
                     Cost: $${m.cost.toFixed(2)}<br/>
-                    $/1M: ${(m.cost / m.total * 1000000).toFixed(2)}
+                    $/1M: $${m.costPer1M.toFixed(2)}
                 </div>`;
             },
         },
         dataLabels: { enabled: false },
-        markers: { size: 6 },
     });
 }
 
@@ -578,20 +630,28 @@ function renderTokenVelocity(data, granularity) {
         chart: { type: 'area', height: 280 },
         series: [{ name: unit, data: velocities }],
         colors: ['#d4884a'],
-        xaxis: { categories: dates, labels: { style: { colors: '#7a6555', fontSize: '11px' } } },
-        yaxis: {
-            labels: { style: { colors: '#7a6555', fontSize: '11px' }, formatter: val => formatNumber(val) },
-            title: { text: unit, style: { color: '#7a6555', fontSize: '11px' } },
+        fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 100] },
         },
-        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05, stops: [0, 100] } },
-        stroke: { width: 2, curve: 'smooth' },
+        stroke: { width: 2.5, curve: 'smooth' },
+        markers: { size: 0, hover: { size: 5 } },
+        xaxis: { categories: dates, labels: { style: { colors: '#a89585', fontSize: '10px' } } },
+        yaxis: {
+            labels: { style: { colors: '#a89585', fontSize: '11px' }, formatter: val => formatNumber(val) },
+            title: { text: unit, style: { color: '#a89585', fontSize: '11px' } },
+        },
         dataLabels: { enabled: false },
         annotations: {
             yaxis: [{
                 y: avgVelocity,
                 borderColor: '#d4884a',
-                strokeDashArray: 3,
-                label: { text: `avg ${formatNumber(avgVelocity)}`, style: { color: '#d4884a', background: '#ffffff', fontSize: '11px' } },
+                strokeDashArray: 4,
+                strokeOpacity: 0.4,
+                label: {
+                    text: `avg ${formatNumber(avgVelocity)}`,
+                    style: { color: '#d4884a', background: '#ffffff', fontSize: '10px', fontWeight: 600 },
+                },
             }],
         },
     });

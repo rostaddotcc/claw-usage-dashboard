@@ -67,7 +67,7 @@ Session files at `$DATA_DIR/agents/<agentId>/sessions/<sessionId>.jsonl*`:
 - Theme selector (orange/amber/rose/sage) saves to localStorage, default is `orange`
 - Click-to-copy session IDs in both sessions tables
 - Top Sessions table shows 10 most expensive sessions
-- Design: warm light theme with Inter font, soft rounded cards, no terminal aesthetic
+- Design: warm light theme with Inter font, soft rounded cards, dot-pattern background, gradient area charts, no terminal aesthetic
 
 ## Known Issues
 
@@ -76,4 +76,4 @@ Session files at `$DATA_DIR/agents/<agentId>/sessions/<sessionId>.jsonl*`:
 
 ## CLAUDE.md Drift
 
-`CLAUDE.md` contains outdated references to removed features: `UptimeCollector`, `cron.py` aggregator, uptime/cron tabs, and 9 API endpoints. It also describes a terminal/retro theme that has been replaced with a warm light design. The current codebase has 5 routers, 3 tabs (Usage/Infra/Sessions), and 2 collectors (sessions/system). Trust this file and the source code over CLAUDE.md.
+`CLAUDE.md` contains outdated references to removed features: `UptimeCollector`, `cron.py` aggregator, uptime/cron tabs, and 9 API endpoints. It also describes a terminal/retro theme that has been replaced with a warm light design. Charts use gradient area fills, rounded horizontal bars, and donuts with center totals. The current codebase has 5 routers, 3 tabs (Usage/Infra/Sessions), and 2 collectors (sessions/system). Trust this file and the source code over CLAUDE.md.
