@@ -39,7 +39,6 @@ const CHART_DEFAULTS = {
     yaxis: {
         labels: {
             style: { colors: '#a89585', fontSize: '11px' },
-            formatter: val => formatNumber(val),
         },
     },
 };
